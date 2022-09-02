@@ -6,6 +6,7 @@ from multiprocessing import Lock
 from multiprocessing.sharedctypes import Array
 from threading import Thread
 from typing import List, cast
+import random
 
 from UM.Application import Application
 from UM.Extension import Extension
@@ -17,7 +18,7 @@ from UDECPlugin.pycomm3 import LogixDriver
 
 import os
 
-from PyQt5.QtCore import QObject, pyqtSlot, pyqtSignal, QThread, QTimer
+from PyQt5.QtCore import pyqtSlot, QObject, pyqtSignal, QThread, QTimer, QPoint
 
 i18n_catalog = i18nCatalog("PluginUDEC")  # Translates to a language Cura can read
 
@@ -53,12 +54,22 @@ class PluginUDEC(QObject, Extension):
         self.login_view = None
         self.message_view = None
         self.positions_list = []
+        self.new_value = 0
 
         #self.worker = file_worker(self)
         #self.worker.file_changed.connect(self.file_changed)
         #self.worker_thread = QThread()
         #self.worker.moveToThread(self.worker_thread)
         #self.worker_thread.start()
+
+    @pyqtSlot(result = float)
+    def update_series(self):
+        return self.new_value
+
+    @pyqtSlot(str)
+    def save_value(self, ip):
+        with LogixDriver(ip, init__program_tags=True) as plc:
+            self.new_value = plc.read('Program:MainProgram.array_tag{3}').value[0]
 
     def show_login(self):
         """Displays an error message with the given title and message"""
@@ -74,6 +85,20 @@ class PluginUDEC(QObject, Extension):
         with LogixDriver(ip, init__program_tags=True) as plc:
             print(plc.info)
             return str(plc.info)
+
+    @pyqtSlot(str, result=str)
+    def write_matrix(self, ip) -> str:
+        with LogixDriver(ip, init__program_tags=True) as plc:
+            plc.write('Program:MainProgram.matrix_tag{1200}', self.generate_matrix(1200))
+            print('--------------------------------------------------')
+            print('DONE')
+            print('--------------------------------------------------')
+
+    def generate_matrix(self, number) -> List[float]:
+        element_list = []
+        for i in range(number):
+            element_list.append(random.random()*100)
+        return element_list
 
     @pyqtSlot(str)
     def start_worker(self, path):
