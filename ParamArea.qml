@@ -8,6 +8,7 @@ Item
     property alias name: title.text
     property alias paramText: paramfield.text
     property alias help: helpText.text
+    property string helpSide: ""
     width: 140;
     height: 25;
 
@@ -37,10 +38,17 @@ Item
             width: helpText.contentWidth;
             height: helpText.contentHeight;
             border.width: 1;
-            color: "#fffaf0";
-            anchors.left: parent.right;
-            anchors.leftMargin: 20;
-            anchors.verticalCenter: parent.verticalCenter;
+            color: "#fffaf0";        
+            anchors.margins: 20
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.right: (helpSide == "left") ? parent.left : undefined
+            anchors.left: (helpSide == "rigth") ? parent.right : undefined
+
+
+            //anchors.left: parent.right;
+            //anchors.margins: 20
+            //anchors.leftMargin: 20;
+            //anchors.verticalCenter: parent.verticalCenter;
             visible: parent.hovered;
             z: 100;
 

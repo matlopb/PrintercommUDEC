@@ -6,8 +6,13 @@ from multiprocessing import Lock
 from multiprocessing.sharedctypes import Array
 from threading import Thread
 from typing import List, cast
+from functools import reduce
 import random
 import time
+
+import sys
+from pathlib import Path
+import numpy as np
 
 from UM.Application import Application
 from UM.Extension import Extension
@@ -17,6 +22,9 @@ from UM.i18n import i18nCatalog
 from cura.CuraApplication import CuraApplication
 from .pycomm3.pycomm3 import LogixDriver
 #from pycomm3 import LogixDriver
+from .matplotlib_backend_qtquick.backend_qtquick import NavigationToolbar2QtQuick
+from .matplotlib_backend_qtquick.backend_qtquickagg import FigureCanvasQtQuickAgg
+from .matplotlib_backend_qtquick.qt_compat import QtGui, QtQml, QtCore
 
 import os
 
@@ -58,6 +66,9 @@ class PluginUDEC(QObject, Extension):
         self.positions_list = []
         self.new_value = 0
         self.tag_dict = {}
+        self.ip = ""
+
+
 
         #self.worker = file_worker(self)
         #self.worker.file_changed.connect(self.file_changed)
@@ -67,80 +78,69 @@ class PluginUDEC(QObject, Extension):
 
     @pyqtSlot(str, result=list)
     def plc_tag_list(self, ip) -> List[str]:
-        with LogixDriver(ip) as plc:
-            tag_list = []
-            tag_values = []
-            total_elements = 1
-            counter = 0
-            element_number = 0
-            program_name = 'MainProgram'
-            tag_name1 = 'flag'
-            tag_name2 = 'return_signal'
-            print(plc.read(f'Program:{program_name}.{tag_name1}'))
-            print(plc.read(f'Program:{program_name}.{tag_name2}'))
-            copy = plc.get_tag_list('Program:MainProgram').copy()
-            for tag in copy:
-                tag_dimensions = tag["dimensions"].copy()
-                for dimension in tag["dimensions"]:
-                    if dimension == 0:
-                        tag_dimensions.remove(0)
-                    else:
-                        total_elements *= dimension
-                    print(total_elements)
-                tag_elements = self.show_all_elements(tag["tag_name"].replace("Program:Program:MainProgram.",''), tag_dimensions)
-                for i in range(total_elements):
-                    with LogixDriver(ip) as plc:
-                        print(tag["tag_name"], i)
-                        if total_elements == 1:
-                            tag_value = plc.read(tag["tag_name"].replace("Program:Program:MainProgram",'Program:MainProgram')).value
-                        else:
-                            print("tag's previous name is: ", tag["tag_name"])
-                            tag_real_name = tag["tag_name"].replace("Program:Program:MainProgram",'Program:MainProgram')
-                            tag_real_name = tag_real_name + "{" + str(total_elements) + "}"
-                            print("tag's real name is: ", tag_real_name)
-                            tag_value = plc.read(tag_real_name).value[i]
-                        print("tag value is: ", tag_value)
-                    tag_values.append(tag_value)
-                print("tag values are: ", tag_values)
-                for element in tag_elements:
-                    tag_list.append(element)
-                    self.tag_dict[element] = [tag_values[counter],  element_number, total_elements]
-                    counter += 1
-                    element_number += 1
-                total_elements = 1
-                element_number = 0
-            print("tag dictionary is: ", self.tag_dict)
-            return tag_list
+        self.ip = ip
+        plc = LogixDriver(ip, init__program_tags=True)
+        plc.open()
+        tag_list = plc.get_tag_list('Program:MainProgram').copy()
+        tag_name_list = []
+        element_number = 0
+        tags_info_dict = self.get_tags_info(tag_list) # returns names and dimensions
 
-    def show_all_elements(self, tag_name, tag_dim) -> List[str]:
+        for name in tags_info_dict:
+            tag_elements_name = self.get_tag_elements(name.replace("Program:MainProgram.",''), tags_info_dict[name][1])
+            for element in tag_elements_name:
+                tag_name_list.append(element)
+                self.tag_dict[element] = [element_number, tags_info_dict[name][0]]
+                element_number += 1
+            element_number = 0
+        plc.close()
+        return tag_name_list
+
+    def get_tags_info(self, tag_list) -> dict:
+        tags_info_list = reduce(self.fetch_info, tag_list, dict())
+        return tags_info_list
+
+    def fetch_info(self, acc_dict, cur_dict) -> dict:
+        tag_name = cur_dict["tag_name"].replace("Program:Program:MainProgram.","Program:MainProgram.")
+        tag_dim = cur_dict["dimensions"]
+        tag_total_elements = self.count_elements(tag_dim)
+        acc_dict[tag_name] = [tag_total_elements, tag_dim]
+        return acc_dict
+
+    def count_elements(self, dimensions) -> float:
+        total_elements = 1
+        dim_copy = dimensions.copy()
+        for axis_value in dim_copy:
+            if axis_value == 0:
+                dimensions.remove(0)
+            else:
+                total_elements *= axis_value
+        return total_elements
+
+    def get_tag_elements(self, tag_name, tag_dim) -> List[str]:
         length = len(tag_dim)
         tag_list = []
         if length == 0:
             tag_list.append(tag_name)
-            print(tag_name)
         elif length == 1:
             for i in range(tag_dim[0]):
                 tag_list.append(tag_name+"["+str(i)+"]")
-                print(tag_name, [i])
         elif length == 2:
             for i in range(tag_dim[0]):
                 for j in range(tag_dim[1]):
                     tag_list.append(tag_name+"["+str(i)+"]"+"["+str(j)+"]")
-                    print(tag_name, [i], [j])
         elif length == 3:
             for i in range(tag_dim[0]):
                 for j in range(tag_dim[1]):
                     for k in range(tag_dim[2]):
                         tag_list.append(tag_name+"["+str(i)+"]"+"["+str(j)+"]"+"["+str(k)+"]")
-                        print(tag_name, [i], [j], [k])
         return tag_list
 
     @pyqtSlot(str, str, result = float)
     def update_series(self, tag, ip):
         tag_name = tag.split('[')[0]
-        print(tag_name)
-        tag_element = self.tag_dict[tag][1]
-        tag_dim = self.tag_dict[tag][2]
+        tag_element = self.tag_dict[tag][0]
+        tag_dim = self.tag_dict[tag][1]
         with LogixDriver(ip) as plc:
             if tag_dim == 1:
                 value = plc.read('Program:MainProgram.' + tag_name).value
@@ -168,11 +168,15 @@ class PluginUDEC(QObject, Extension):
             return
         self.login_view.show()
 
-    @pyqtSlot(str, result=str)
-    def get_plc_info(self, ip) -> str:
+    @pyqtSlot(str, result=list)
+    def get_plc_info(self, ip) -> List[str]:
         with LogixDriver(ip, init__program_tags=True) as plc:
-            print(plc.info)
-            return str(plc.info)
+            product_name = plc.info["product_name"]
+            name = plc.info["name"]
+            programs = ""
+            for program in list(plc.info["programs"].keys()):
+                programs += str(program)
+            return [product_name, name, programs]
 
     @pyqtSlot(str, result=str)
     def write_matrix(self, ip) -> str:
@@ -581,34 +585,34 @@ class PluginUDEC(QObject, Extension):
         self.message_view.show()
 
 
-class file_worker(QObject):
-    file_changed = pyqtSignal(str)
+#class file_worker(QObject):
+#    file_changed = pyqtSignal(str)
+#
+#    @pyqtSlot(str)
+#    def run(self, path):
+#        self.showFileContent(path)
 
-    @pyqtSlot(str)
-    def run(self, path):
-        self.showFileContent(path)
+#    def showFileContent(self, url) -> None:
+#        """Show the content of the selected file in the bottom right text box."""
 
-    def showFileContent(self, url) -> None:
-        """Show the content of the selected file in the bottom right text box."""
+#        file = open(self.get_url(url), mode='r', encoding='utf-8')
+#        content = file.read()
+#        self.file_changed.emit(content)
+#        file.close()
 
-        file = open(self.get_url(url), mode='r', encoding='utf-8')
-        content = file.read()
-        self.file_changed.emit(content)
-        file.close()
+#    def get_url(self, url) -> str:
+#        """get the real URL for the selected file"""
 
-    def get_url(self, url) -> str:
-        """get the real URL for the selected file"""
+#        if platform.system() == 'Windows':
+#            fileUrl = self.get_os_path(url, '')
+#            return fileUrl
+#        fileUrl = self.get_os_path(url, '/')
+#        return fileUrl
 
-        if platform.system() == 'Windows':
-            fileUrl = self.get_os_path(url, '')
-            return fileUrl
-        fileUrl = self.get_os_path(url, '/')
-        return fileUrl
-
-    def get_os_path(self, url, separator) -> str:
-        tmp = [separator]
-        for i in range(len(url)):
-            if i > 7:
-                tmp[0] += str(url[i])
-        file_path = ''.join(tmp)
-        return file_path
+#    def get_os_path(self, url, separator) -> str:
+#        tmp = [separator]
+#        for i in range(len(url)):
+#            if i > 7:
+#                tmp[0] += str(url[i])
+#        file_path = ''.join(tmp)
+#        return file_path
