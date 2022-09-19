@@ -64,7 +64,7 @@ class PluginUDEC(QObject, Extension):
         self.login_view = None
         self.message_view = None
         self.positions_list = []
-        self.new_value = 0
+        self.saved_value = 0
         self.tag_dict = {}
         self.ip = ""
 
@@ -90,7 +90,7 @@ class PluginUDEC(QObject, Extension):
             tag_elements_name = self.get_tag_elements(name.replace("Program:MainProgram.",''), tags_info_dict[name][1])
             for element in tag_elements_name:
                 tag_name_list.append(element)
-                self.tag_dict[element] = [element_number, tags_info_dict[name][0]]
+                self.tag_dict[element] = [element_number, tags_info_dict[name][0], tags_info_dict[name][2]]
                 element_number += 1
             element_number = 0
         plc.close()
@@ -103,8 +103,9 @@ class PluginUDEC(QObject, Extension):
     def fetch_info(self, acc_dict, cur_dict) -> dict:
         tag_name = cur_dict["tag_name"].replace("Program:Program:MainProgram.","Program:MainProgram.")
         tag_dim = cur_dict["dimensions"]
+        tag_n_dim = cur_dict["dim"]
         tag_total_elements = self.count_elements(tag_dim)
-        acc_dict[tag_name] = [tag_total_elements, tag_dim]
+        acc_dict[tag_name] = [tag_total_elements, tag_dim, tag_n_dim]
         return acc_dict
 
     def count_elements(self, dimensions) -> float:
@@ -128,7 +129,7 @@ class PluginUDEC(QObject, Extension):
         elif length == 2:
             for i in range(tag_dim[0]):
                 for j in range(tag_dim[1]):
-                    tag_list.append(tag_name+"["+str(i)+"]"+"["+str(j)+"]")
+                    tag_list.append(tag_name+"["+str(i)+","+str(j)+"]")
         elif length == 3:
             for i in range(tag_dim[0]):
                 for j in range(tag_dim[1]):
@@ -136,23 +137,50 @@ class PluginUDEC(QObject, Extension):
                         tag_list.append(tag_name+"["+str(i)+"]"+"["+str(j)+"]"+"["+str(k)+"]")
         return tag_list
 
-    @pyqtSlot(str, str, result = float)
-    def update_series(self, tag, ip):
-        tag_name = tag.split('[')[0]
-        tag_element = self.tag_dict[tag][0]
-        tag_dim = self.tag_dict[tag][1]
-        with LogixDriver(ip) as plc:
+    @pyqtSlot(list, str, result = list)
+    def update_series(self, tag_list, ip) -> List[float]:
+        tag_names = []
+        values = []
+        for tag in tag_list:
+            print("tag list:", tag_list)
+            print("tag:", tag)
+            tag_name = tag.split('[')[0]
+            print("tag name:", tag_name)
+            tag_dim = self.tag_dict[tag][1]
+            tag_n_dim = self.tag_dict[tag][2]
             if tag_dim == 1:
-                value = plc.read('Program:MainProgram.' + tag_name).value
+                tag_names.append('Program:MainProgram.' + tag_name)
+            elif tag_n_dim == 2:
+                tag_names.append('Program:MainProgram.' + tag)
             else:
-                value = plc.read('Program:MainProgram.' + tag_name + "{"+str(tag_dim)+"}").value[tag_element]
-        if value is True:
-            self.new_value = 1
-        elif value is False:
-            self.new_value = 0
+                tag_element = self.tag_dict[tag][0]
+                tag_names.append('Program:MainProgram.' + tag_name + "["+str(tag_element)+"]")
+
+        plc = LogixDriver(ip)
+        n_tags = len(tag_names)
+        #try:
+        print("tag names:", tag_names)
+        plc.open()
+        tag_read = plc.read(*tag_names)
+        plc.close()
+        print("tag read is:", tag_read)
+        if n_tags > 1:
+            for element in tag_read:
+                print("element is:", element)
+                tag_value = element.value
+                if tag_value is True:
+                    tag_value = 1
+                elif tag_value is False:
+                    tag_value = 0
+                values.append(tag_value)
         else:
-            self.new_value = value
-        return self.new_value
+            tag_value = tag_read.value
+            if tag_value is True:
+                tag_value = 1
+            elif tag_value is False:
+                tag_value = 0
+            values.append(tag_value)
+        return values
 
     @pyqtSlot(str)
     def save_value(self, ip):

@@ -12,7 +12,7 @@ Window {
 
     width: {
         if (Qt.platform.os == "linux"){
-            730 * screenScaleFactor
+            900 * screenScaleFactor
         }
         else if (Qt.platform.os == "windows"){
             900 * screenScaleFactor
@@ -59,6 +59,10 @@ Window {
     title: qsTr("Connect to printer")
     property string plc_path: ""
     property var plc_info:["-----", "-----", "-----"]
+    property bool tagbox1_active: false
+    property bool tagbox2_active: false
+    property bool tagbox3_active: false
+    property bool tagbox4_active: false
 
     onClosing:{
         close.accepted = false
@@ -77,11 +81,12 @@ Window {
                 tab: Rectangle {
                     color: styleData.selected ? "ghostwhite" :"silver"
                     border.color:  "steelblue"
-                    implicitWidth: login_dialog.width/3 - 33
-                    implicitHeight: 20
+                    implicitWidth: (login_dialog.width-48)/3
+                    implicitHeight: 30
                     radius: 2
                     Text {
                         id: text
+                        font.bold: true
                         anchors.centerIn: parent
                         text: styleData.title
                         color: styleData.selected ? "black" : "black"
@@ -97,6 +102,7 @@ Window {
             Rectangle {
                 width: frame.width
                 height: frame.height
+                border.width: 1
 
                 ListModel{
                     id: plc_info_model
@@ -140,13 +146,13 @@ Window {
                     anchors.top: parent.top;
                     anchors.topMargin: 20;
                     anchors.left: parent.left;
-                    anchors.leftMargin: 40;
+                    anchors.leftMargin: 100;
                 }
 
                 ColumnLayout{
                     id: main_column
 
-                    spacing: 10
+                    spacing: 30
                     anchors.horizontalCenter: login_title.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
 
@@ -174,7 +180,7 @@ Window {
 
                             width: 140
                             placeholderText: qsTr("e.g. 192.168.1.34/2");
-                            text: qsTr("192.168.1.27/2");
+                            text: qsTr("192.168.0.16/2");
                             validator: RegExpValidator{ regExp: /^(([01]?[0-9]?[0-9]|2([0-4][0-9]|5[0-5]))\.){3}([01]?[0-9]?[0-9]|2([0-4][0-9]|5[0-5]))\/(([0-6]|3([0])|2([0-9]))\.)$/}
                         }
                     }
@@ -210,7 +216,7 @@ Window {
                     anchors.top: parent.top;
                     anchors.topMargin: 20;
                     anchors.right: parent.right;
-                    anchors.rightMargin: 40;
+                    anchors.rightMargin: 100;
                 }
 
                 ColumnLayout
@@ -238,28 +244,105 @@ Window {
         Tab {
             id: monitoring_tab
 
-            title: "Monitoring"
+            title: "Monitoreo"
             active: true
             enabled: true
             Rectangle {
 
                 width: frame.width
                 height: frame.height
+                border.width: 1
 
-                function load_tags(){my_combobox.model = manager.plc_tag_list(plc_path)}
+                function load_tags(){
+                    var tag_list = ["Seleccione un tag..."]
+                    var get_list = manager.plc_tag_list(plc_path)
+                    for(let element in get_list){
+                        tag_list.push(get_list[element])
+                    }
+                    //tag_list.push(manager.plc_tag_list(plc_path))
+                    tagbox_1.model = tag_list
+                    tagbox_2.model = tag_list
+                    tagbox_3.model = tag_list
+                    tagbox_4.model = tag_list
+                }
                 function stop_timer() {date_timer.running = false}
 
-                ComboBox{
-                    id: my_combobox
+                Text{
+                    id: tab_title
 
-                    width: 200
-                    editable: true
-                    onActivated: {
-                        date_timer.running = true
-                        chart.series(0).name = currentText
-                        chart.series(0).clear()
-                    }
+                    text: "Monitoreo de variables"
+                    font.bold: true;
+                    font.pointSize: 16;
+                    font.pixelSize: 20;
+                    anchors.top: parent.top;
+                    anchors.topMargin: 20;
+                    anchors.horizontalCenter: parent.horizontalCenter
+
                 }
+
+                ColumnLayout{
+                    id: combobox_column
+
+                    spacing: 20
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.horizontalCenterOffset: -200
+
+                    ComboBox{
+                        id: tagbox_1
+
+                        width: 400
+                        editable: true
+                        onActivated: {
+                            date_timer.running = true
+                            tagbox1_active = true
+                            chart.series(0).name = currentText
+                            chart.series(0).clear()
+                        }
+                    }
+
+                    ComboBox{
+                        id: tagbox_2
+
+                        width: 400
+                        editable: true
+                        onActivated: {
+                            date_timer.running = true
+                            tagbox2_active = true
+                            chart.series(1).name = currentText
+                            chart.series(1).clear()
+                        }
+                    }
+
+                    ComboBox{
+                        id: tagbox_3
+
+                        width: 400
+                        editable: true
+                        onActivated: {
+                            date_timer.running = true
+                            tagbox3_active = true
+                            chart.series(2).name = currentText
+                            chart.series(2).clear()
+                        }
+                    }
+
+                    ComboBox{
+                        id: tagbox_4
+
+                        width: 400
+                        editable: true
+                        onActivated: {
+                            date_timer.running = true
+                            tagbox4_active = true
+                            chart.series(3).name = currentText
+                            chart.series(3).clear()
+                        }
+                    }
+
+                }
+
+
 
                 ChartView {
                     id: chart
@@ -267,8 +350,9 @@ Window {
                     y: 90
                     width: 500
                     height: 300
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: combobox_column.right
+                    anchors.leftMargin: 30
+                    anchors.verticalCenter: combobox_column.verticalCenter
 
                     ValueAxis{
                         id: axisY
@@ -288,7 +372,10 @@ Window {
 
                 Component.onCompleted: {
                     console.log("Se ha iniciado QML\n")
-                    var series1 = chart.createSeries(ChartView.SeriesTypeLine,"My grafico1",time_axis,axisY)
+                    var series1 = chart.createSeries(ChartView.SeriesTypeLine,"tag 1",time_axis,axisY)
+                    var series2 = chart.createSeries(ChartView.SeriesTypeLine,"tag 1",time_axis,axisY)
+                    var series3 = chart.createSeries(ChartView.SeriesTypeLine,"tag 1",time_axis,axisY)
+                    var series4 = chart.createSeries(ChartView.SeriesTypeLine,"tag 1",time_axis,axisY)
                 }
 
                 Timer{
@@ -304,8 +391,34 @@ Window {
                         time_axis.min = new Date(year, 0, 0, hours, minutes - 1, seconds)
                         time_axis.max = new Date(year, 0, 0, hours, minutes, seconds)
 
-                        var Y = manager.update_series(my_combobox.currentText, plc_path);
-                        chart.series(0).append(time_axis.max, Y);
+                        var tagboxes_info = {"tagbox_1" : [tagbox1_active, tagbox_1.currentText, 0], "tagbox_2" : [tagbox2_active, tagbox_2.currentText, 1], "tagbox_3" : [tagbox3_active, tagbox_3.currentText, 2], "tagbox_4" : [tagbox4_active, tagbox_4.currentText, 3]}
+                        var active_tagboxes = who_active(tagboxes_info)
+                        update_chart(active_tagboxes)
+                    }
+
+                    function who_active(tagbox_dict){
+                        var active_elements = {}
+                        for (let tag in tagbox_dict){
+                            if (tagbox_dict[tag][0] && tagbox_dict[tag][1] != "Seleccione un tag..."){
+                                active_elements[tag] = [tagbox_dict[tag][1], tagbox_dict[tag][2]]
+                            }
+                        }
+                        return active_elements
+                    }
+
+                    function update_chart(tag_dict){
+                        var tag_names = []
+                        for (let tag in tag_dict){
+                            tag_names.push(tag_dict[tag][0])
+                        }
+                        if (tag_names.length != 0){
+                            var tagbox_values = manager.update_series(tag_names, plc_path)
+                            var counter = 0
+                            for (let element in tag_dict){
+                                chart.series(tag_dict[element][1]).append(time_axis.max, tagbox_values[counter])
+                                counter++
+                            }
+                        }
                     }
                 }
             }
