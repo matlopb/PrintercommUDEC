@@ -20,46 +20,41 @@ Item
         height: parent.height;
         placeholderText: qsTr("Dimensión en mm");
         validator: RegExpValidator{ regExp: /\d{1,7}([.]\d{1,3})+$/ }
+    }
+
+    Text
+    {
+        id: title;
+
+        text: qsTr(name);
+        anchors.right: paramfield.left;
+        anchors.verticalCenter: paramfield.verticalCenter;
+        anchors.rightMargin: 20;
+    }
+
+    Rectangle
+    {
+        id: helpZone;
+
+        width: helpText.contentWidth;
+        height: helpText.contentHeight;
+        border.width: 1;
+        color: "#fffaf0";
+        anchors.margins: 20
+        anchors.verticalCenter: paramfield.verticalCenter
+        anchors.right: (helpSide == "left") ? paramfield.left : undefined
+        anchors.left: (helpSide == "rigth") ? paramfield.right : undefined
+        visible: paramfield.hovered;
+        z: 100;
 
         Text
         {
-            id: title;
+            id: helpText;
 
-            text: qsTr(name);
-            anchors.right: parent.left;
-            anchors.verticalCenter: parent.verticalCenter;
-            anchors.rightMargin: 20;
-        }
-
-        Rectangle
-        {
-            id: helpZone;
-
-            width: helpText.contentWidth;
-            height: helpText.contentHeight;
-            border.width: 1;
-            color: "#fffaf0";        
-            anchors.margins: 20
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.right: (helpSide == "left") ? parent.left : undefined
-            anchors.left: (helpSide == "rigth") ? parent.right : undefined
-
-
-            //anchors.left: parent.right;
-            //anchors.margins: 20
-            //anchors.leftMargin: 20;
-            //anchors.verticalCenter: parent.verticalCenter;
-            visible: parent.hovered;
-            z: 100;
-
-            Text
-            {
-                id: helpText;
-
-                text: help;
-                anchors.fill: parent;
-            }
+            text: help;
+            anchors.fill: parent;
         }
     }
+
 
 }

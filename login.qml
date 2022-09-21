@@ -10,6 +10,16 @@ import QtQuick.Layouts 1.3
 Window {
     id: login_dialog
 
+    visible: true
+    color: "#EBEBEB"
+    title: qsTr("Connect to printer")
+    property string plc_path: ""
+    property var plc_info:["-----", "-----", "-----"]
+    property bool tagbox1_active: false
+    property bool tagbox2_active: false
+    property bool tagbox3_active: false
+    property bool tagbox4_active: false
+
     width: {
         if (Qt.platform.os == "linux"){
             900 * screenScaleFactor
@@ -54,15 +64,26 @@ Window {
             900 * screenScaleFactor
         }
     }
-    visible: true
-    color: "#EBEBEB"
-    title: qsTr("Connect to printer")
-    property string plc_path: ""
-    property var plc_info:["-----", "-----", "-----"]
-    property bool tagbox1_active: false
-    property bool tagbox2_active: false
-    property bool tagbox3_active: false
-    property bool tagbox4_active: false
+
+    Component.onCompleted: {
+            x = Screen.width / 2 - width / 2
+            y = Screen.height / 2 - height / 2
+
+            if (manager.look_for_gcode() == false){
+                login_tab.item.notify_gcode_status()
+            }
+        }
+
+    Connections {
+        target: manager
+
+        function onProgressEnd() {
+            win.close()
+            var mDialog = Qt.createComponent("MessageDialog.qml");
+            win = mDialog.createObject(dialog)
+            win.show()
+        }
+    }
 
     onClosing:{
         close.accepted = false
@@ -70,11 +91,46 @@ Window {
         close.accepted = true
     }
 
+    Button{
+        id: send_instructions
+
+        width: 200;
+        height: 30;
+        enabled: false
+        anchors.right: parent.right
+        anchors.rightMargin: 25;
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 10
+        onClicked:{
+            manager.send_instructions()
+        }
+
+        style: ButtonStyle
+        {
+            label: Image
+            {
+                id: writeImage;
+                source: "./images/write.png";
+                fillMode: Image.PreserveAspectFit;
+                horizontalAlignment: Image.AlignLeft;
+            }
+        }
+
+        Text
+        {
+            text: qsTr("Enviar instrucciones")
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+        }
+    }
+
     TabView {
         id: frame
         height: parent.height - 50
         width: parent.width -50
-        anchors.centerIn: parent
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
 
         style: TabViewStyle {
                 frameOverlap: 1
@@ -99,10 +155,19 @@ Window {
             id: login_tab
 
             title: "Log to machine"
+            active: true
+            enabled: true
+
             Rectangle {
                 width: frame.width
                 height: frame.height
                 border.width: 1
+
+                function notify_gcode_status(){
+                    instructions_status_text.text = qsTr("No existe Gcode en el sistema. \nRebane una figura antes de conectar a una impresora")
+                    login_button.enabled = false
+                    generate_instructions.enabled = false
+                }
 
                 ListModel{
                     id: plc_info_model
@@ -186,7 +251,7 @@ Window {
                     }
 
                     Button{
-                        id: login
+                        id: login_button
 
                         text: qsTr("conectar")
                         onClicked: {
@@ -224,19 +289,59 @@ Window {
                     anchors.horizontalCenter: params_title.horizontalCenter
                     anchors.top: params_title.bottom;
                     anchors.topMargin: 20;
+                    Layout.preferredWidth: frame.width/2
+                    Layout.preferredHeight: frame.height
                     spacing: 10;
                     z:100
 
-                    ParamArea{id: sb; paramText: "538"; name: "S_B"; help: " Es la distancia entre los actuadores del RDL "; helpSide: "left"}
-                    ParamArea{id: sp; paramText: "108"; name: "s_p"; help: " Es la distancia entre los puntos de conexion \n del efector y los brazos del robot "; helpSide: "left"}
-                    ParamArea{id: ub; paramText: "411"; name: "U_B"; help: " Es la distancia entre el actuador y el centro \n de la base "; helpSide: "left"}
-                    ParamArea{id: up; paramText: "62"; name: "u_p"; help: " Es la distancia entre el punto de conexion y \n el centro del efector "; helpSide: "left"}
-                    ParamArea{id: wb; paramText: "310"; name: "W_B"; help: " Es la distancia entre el centro de la base y \n el punto medio del tramo descrito por S_b "; helpSide: "left"}
-                    ParamArea{id: wp; paramText: "31"; name: "w_p"; help: " Es la distancia entre el efector y el punto \n medio del tramo descrito por s_p "; helpSide: "left"}
-                    ParamArea{id: armLen; paramText: "983"; name: "Largo de brazo"; help: " Es el largo de los brazos de la impresora "; helpSide: "left"}
-                    ParamArea{id: printerH; paramText: "1460"; name: "Altura impresora"; help: " Es la distancia entre la base del RDL y la \n superficie de impresion "; helpSide: "left"}
-                    ParamArea{id: radio; paramText: "225"; name: "Radio WS"; help: " Es el radio de la base del espacio de trabajo "; helpSide: "left"}
-                    ParamArea{id: altura; paramText: "500"; name: "Altura WS"; help: " Es la altura del espacio de trabajo "; helpSide: "left"}
+                    Text{
+                        id: params_subtitle
+
+                        Layout.preferredWidth: params_title.width
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("Para generar las instrucciones indique los \nparametros de la impresora")
+                    }
+
+                    ParamArea{id: sb; paramText: "538"; name: "S_B"; help: " Es la distancia entre los actuadores del RDL "; helpSide: "left"; Layout.alignment: Qt.AlignHCenter}
+                    ParamArea{id: sp; paramText: "108"; name: "s_p"; help: " Es la distancia entre los puntos de conexion \n del efector y los brazos del robot "; helpSide: "left"; Layout.alignment: Qt.AlignHCenter}
+                    ParamArea{id: ub; paramText: "411"; name: "U_B"; help: " Es la distancia entre el actuador y el centro \n de la base "; helpSide: "left"; Layout.alignment: Qt.AlignHCenter}
+                    ParamArea{id: up; paramText: "62"; name: "u_p"; help: " Es la distancia entre el punto de conexion y \n el centro del efector "; helpSide: "left"; Layout.alignment: Qt.AlignHCenter}
+                    ParamArea{id: wb; paramText: "310"; name: "W_B"; help: " Es la distancia entre el centro de la base y \n el punto medio del tramo descrito por S_b "; helpSide: "left"; Layout.alignment: Qt.AlignHCenter}
+                    ParamArea{id: wp; paramText: "31"; name: "w_p"; help: " Es la distancia entre el efector y el punto \n medio del tramo descrito por s_p "; helpSide: "left"; Layout.alignment: Qt.AlignHCenter}
+                    ParamArea{id: armLen; paramText: "983"; name: "Largo de brazo"; help: " Es el largo de los brazos de la impresora "; helpSide: "left"; Layout.alignment: Qt.AlignHCenter}
+                    ParamArea{id: printerH; paramText: "1460"; name: "Altura impresora"; help: " Es la distancia entre la base del RDL y la \n superficie de impresion "; helpSide: "left"; Layout.alignment: Qt.AlignHCenter}
+                    ParamArea{id: radio; paramText: "225"; name: "Radio WS"; help: " Es el radio de la base del espacio de trabajo "; helpSide: "left"; Layout.alignment: Qt.AlignHCenter}
+                    ParamArea{id: altura; paramText: "500"; name: "Altura WS"; help: " Es la altura del espacio de trabajo "; helpSide: "left"; Layout.alignment: Qt.AlignHCenter}
+
+                    Rectangle{
+                        id: instructions_status
+
+                        Layout.preferredWidth: frame.width/3
+                        Layout.preferredHeight: 50
+                        Layout.alignment: Qt.AlignHCenter
+                        border.width: 1
+
+                        Text{
+                            id: instructions_status_text
+
+                            height: parent.height
+                            width: parent.width
+                            text: qsTr("No existen instrucciones en memeoria")
+                        }
+                    }
+
+                    Button{
+                        id: generate_instructions
+
+                        Layout.preferredWidth: 150
+                        Layout.preferredHeight: 50
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("Generar \n instrucciones")
+                        onClicked: {
+                            manager.generate_instructions_list(sb.paramText, sp.paramText, wb.paramText, wp.paramText, ub.paramText, up.paramText, armLen.paramText,
+                                                               printerH.paramText, radio.paramText, altura.paramText)
+                        }
+                    }
                 }
             }
         }
@@ -246,7 +351,7 @@ Window {
 
             title: "Monitoreo"
             active: true
-            enabled: true
+            enabled: false
             Rectangle {
 
                 width: frame.width
@@ -259,7 +364,6 @@ Window {
                     for(let element in get_list){
                         tag_list.push(get_list[element])
                     }
-                    //tag_list.push(manager.plc_tag_list(plc_path))
                     tagbox_1.model = tag_list
                     tagbox_2.model = tag_list
                     tagbox_3.model = tag_list
@@ -428,7 +532,8 @@ Window {
             Rectangle {
                 color: "green"
                 width: frame.width
-                height: frame.height}
+                height: frame.height
+            }
         }
     }
 }

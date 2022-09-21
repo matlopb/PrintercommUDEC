@@ -158,7 +158,6 @@ class PluginUDEC(QObject, Extension):
 
         plc = LogixDriver(ip)
         n_tags = len(tag_names)
-        #try:
         print("tag names:", tag_names)
         plc.open()
         tag_read = plc.read(*tag_names)
@@ -206,6 +205,63 @@ class PluginUDEC(QObject, Extension):
                 programs += str(program)
             return [product_name, name, programs]
 
+    @pyqtSlot()
+    def send_instructions(self):
+        print("----------------------------------------------------------------------------------------")
+        print("ENVIAR INSTRUCCIONES")
+        print("----------------------------------------------------------------------------------------")
+        #with LogixDriver(self.ip) as plc:
+        #    plc.write("COLOCAR LA MATRIZ AQUI")
+
+    @pyqtSlot(float, float, float, float, float, float, float, float, float, float)
+    def  generate_instructions_list(self, sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height):
+        """Responsible for using the given parameters to call the functions which calculate the instructions and
+        then write them in a L5K file."""
+
+        params = [sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height]
+        print("Los parametros son:", str(params))
+        if self.are_valid(params) is False:
+            print("ERROR DE VALIDACION")
+            self.progress_end.emit()
+            return
+        print("PARAMETROS VALIDOS")
+        coordinates = self.get_coordinates(self.split_lines(self.get_gcode()))
+        print("SE OBTUVIERON LAS COORDENADAS")
+        if self.check_ws(ws_radio, ws_height, coordinates):
+            ws_coordinates = self.z_bias(coordinates, float(height))
+            parameters = [sb, sp, wb, wp, ub, up, arm_length]
+            try:
+                self.inv_kin_problem(ws_coordinates, parameters)
+                print("SE CALCULO EL PROBLEMA INVERSO")
+                self.positions_list = self.flatten(self.positions_list)
+                print(self.positions_list, "THE TOTAL LENGTH IS:", len(self.positions_list))
+            except ValueError:
+                self.set_message_params('e', 'Se produjo un error', 'Se ha producido un error de calculo. Por favor '
+                                                                    'revise que los datos de impresora esten '
+                                                                    'correctos')
+                self.progress_end.emit()
+                return
+            print("#################################################################################################################################"
+                "###################################################################################################################################")
+            self.set_message_params('i', 'Operacion finalizada', 'Se termino la generacion de instrucciones. Las '
+                                                                 'instrucciones fueron guardadas en el archivo '
+                                                                 'indicado')
+            print("DE FIN DE PROCESO")
+            self.progress_end.emit()
+
+    def flatten(self, list) -> List:
+        flattened_list = [item for sublist in list for item in sublist]
+        return flattened_list
+
+    @pyqtSlot(result=bool)
+    def look_for_gcode(self):
+        scene = Application.getInstance().getController().getScene()
+        if not hasattr(scene, "gcode_dict"):
+            Logger.log("e", "no gcode in system")
+            return False
+        return True
+
+# ----------------------------------------------------------------------------------------------------
     @pyqtSlot(str, result=str)
     def write_matrix(self, ip) -> str:
         with LogixDriver(ip, init__program_tags=True) as plc:
@@ -219,6 +275,7 @@ class PluginUDEC(QObject, Extension):
         for i in range(number):
             element_list.append(random.random()*100)
         return element_list
+# -----------------------------------------------------------------------------------------------------
 
     @pyqtSlot(str)
     def start_worker(self, path):
@@ -238,8 +295,8 @@ class PluginUDEC(QObject, Extension):
     @threaded
     def generatePositionsAsync(self, sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height, file_path,
                                overwrite, destination_path=None, dir_path=None) -> None:
-        """Called when the user presses the 'generate instructions' button. Responsible for using the given parameters
-         to call the functions which calculate the instructions and then write them in a L5K file."""
+        """Responsible for using the given parameters to call the functions which calculate the instructions and
+        then write them in a L5K file."""
 
         print("SE INICIO EL PROCESO GENERATEPOSITIONS ASYNC")
         params = [sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height]
@@ -286,39 +343,40 @@ class PluginUDEC(QObject, Extension):
         self.generatePositionsAsync(sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height, file_path,
                                     overwrite, destination_path, dir_path)
 
-    def are_valid(self, params, file_params) -> bool:
+    def are_valid(self, params, file_params=None) -> bool:
         print("EN PROCESO DE VALIDACION")
         if 0 in params:
             self.set_message_params('e', 'Faltan datos', 'Ingrese todos los datos solicitados e intente otra vez')
             return False
-        if file_params[1]:
-            if not os.path.isfile(self.get_url(file_params[0])):
-                print("no existe archivo")
-                self.set_message_params('e', 'Archivo inexistente',
-                                        'El archivo indicado no es compatible o no existe.\nPor favor seleccione un '
-                                        'archivo valido.')
-                return False
-        if not file_params[1]:
-            if not os.path.isfile(self.get_url(file_params[0])):
-                self.set_message_params('e', 'Archivo inexistente',
-                                        'El archivo indicado no es compatible o no existe.\nPor favor seleccione un '
-                                        'archivo valido.')
-                return False
-            elif os.path.isfile(self.get_url(file_params[2])):
-                self.set_message_params('e', 'Archivo ya existe',
-                                        'El archivo ya existe.\nPor favor escoja otro nombre.')
-                return False
-            elif not os.path.exists(self.get_url(file_params[3])):
-                self.set_message_params('e', 'Carpeta inexistente',
-                                        'La carpeta indicada no existe.\nPor favor seleccione un directorio valido.')
-                return False
+        if file_params is not None:
+            if file_params[1]:
+                if not os.path.isfile(self.get_url(file_params[0])):
+                    print("no existe archivo")
+                    self.set_message_params('e', 'Archivo inexistente',
+                                            'El archivo indicado no es compatible o no existe.\nPor favor seleccione un '
+                                            'archivo valido.')
+                    return False
+            if not file_params[1]:
+                if not os.path.isfile(self.get_url(file_params[0])):
+                    self.set_message_params('e', 'Archivo inexistente',
+                                            'El archivo indicado no es compatible o no existe.\nPor favor seleccione un '
+                                            'archivo valido.')
+                    return False
+                elif os.path.isfile(self.get_url(file_params[2])):
+                    self.set_message_params('e', 'Archivo ya existe',
+                                            'El archivo ya existe.\nPor favor escoja otro nombre.')
+                    return False
+                elif not os.path.exists(self.get_url(file_params[3])):
+                    self.set_message_params('e', 'Carpeta inexistente',
+                                            'La carpeta indicada no existe.\nPor favor seleccione un directorio valido.')
+                    return False
         return True
 
     def check_ws(self, radio, height, coordinates) -> bool:
         """Checks if the given coordinates fit in the working space"""
 
-        for i in range(len(coordinates)):
-            if abs(coordinates[i][0]) > radio or abs(coordinates[i][1]) > radio or abs(coordinates[i][2]) > height:
+        for element in coordinates:
+            if abs(element[0]) > radio or abs(element[1]) > radio or abs(element[2]) > height:
                 self.set_message_params('Coordenadas incompatibles', 'La figura revanada es mas grande que el espacio'
                                                                ' de trabajo disponible')
                 return False
@@ -335,6 +393,7 @@ class PluginUDEC(QObject, Extension):
     def inv_kin_problem(self, coordinates, parameters) -> None:  # List[List[float]]:
         """Returns the positions of the motors for each given coordinate"""
 
+        self.positions_list.clear()
         a = (parameters[0] - parameters[1]) / 2
         b = parameters[2] - parameters[3]
         c = parameters[5] - parameters[4]
