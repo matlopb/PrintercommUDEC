@@ -210,8 +210,9 @@ class PluginUDEC(QObject, Extension):
         print("----------------------------------------------------------------------------------------")
         print("ENVIAR INSTRUCCIONES")
         print("----------------------------------------------------------------------------------------")
-        #with LogixDriver(self.ip) as plc:
-        #    plc.write("COLOCAR LA MATRIZ AQUI")
+        n_instructions = len(self.positions_list)
+        with LogixDriver(self.ip) as plc:
+            plc.write('Program:MainProgram.matrix_tag{' + str(n_instructions) +'}', self.positions_list)
 
     @pyqtSlot(float, float, float, float, float, float, float, float, float, float)
     def  generate_instructions_list(self, sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height):
@@ -219,20 +220,17 @@ class PluginUDEC(QObject, Extension):
         then write them in a L5K file."""
 
         params = [sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height]
-        print("Los parametros son:", str(params))
         if self.are_valid(params) is False:
             print("ERROR DE VALIDACION")
+            Logger.log("e", "Some parameters ")
             self.progress_end.emit()
             return
-        print("PARAMETROS VALIDOS")
         coordinates = self.get_coordinates(self.split_lines(self.get_gcode()))
-        print("SE OBTUVIERON LAS COORDENADAS")
         if self.check_ws(ws_radio, ws_height, coordinates):
             ws_coordinates = self.z_bias(coordinates, float(height))
             parameters = [sb, sp, wb, wp, ub, up, arm_length]
             try:
                 self.inv_kin_problem(ws_coordinates, parameters)
-                print("SE CALCULO EL PROBLEMA INVERSO")
                 self.positions_list = self.flatten(self.positions_list)
                 print(self.positions_list, "THE TOTAL LENGTH IS:", len(self.positions_list))
             except ValueError:
@@ -241,12 +239,9 @@ class PluginUDEC(QObject, Extension):
                                                                     'correctos')
                 self.progress_end.emit()
                 return
-            print("#################################################################################################################################"
-                "###################################################################################################################################")
             self.set_message_params('i', 'Operacion finalizada', 'Se termino la generacion de instrucciones. Las '
                                                                  'instrucciones fueron guardadas en el archivo '
                                                                  'indicado')
-            print("DE FIN DE PROCESO")
             self.progress_end.emit()
 
     def flatten(self, list) -> List:

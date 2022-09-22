@@ -80,7 +80,7 @@ Window {
         function onProgressEnd() {
             win.close()
             var mDialog = Qt.createComponent("MessageDialog.qml");
-            win = mDialog.createObject(dialog)
+            win = mDialog.createObject(login_dialog)
             win.show()
         }
     }
@@ -96,7 +96,7 @@ Window {
 
         width: 200;
         height: 30;
-        enabled: false
+        enabled: true
         anchors.right: parent.right
         anchors.rightMargin: 25;
         anchors.bottom: parent.bottom
@@ -165,8 +165,8 @@ Window {
 
                 function notify_gcode_status(){
                     instructions_status_text.text = qsTr("No existe Gcode en el sistema. \nRebane una figura antes de conectar a una impresora")
-                    login_button.enabled = false
-                    generate_instructions.enabled = false
+                    //login_button.enabled = false
+                    //generate_instructions.enabled = false
                 }
 
                 ListModel{
@@ -245,7 +245,7 @@ Window {
 
                             width: 140
                             placeholderText: qsTr("e.g. 192.168.1.34/2");
-                            text: qsTr("192.168.0.16/2");
+                            text: qsTr("192.168.1.27/2");
                             validator: RegExpValidator{ regExp: /^(([01]?[0-9]?[0-9]|2([0-4][0-9]|5[0-5]))\.){3}([01]?[0-9]?[0-9]|2([0-4][0-9]|5[0-5]))\/(([0-6]|3([0])|2([0-9]))\.)$/}
                         }
                     }
@@ -351,7 +351,7 @@ Window {
 
             title: "Monitoreo"
             active: true
-            enabled: false
+            enabled: true
             Rectangle {
 
                 width: frame.width
