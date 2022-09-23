@@ -105,7 +105,8 @@ class PluginUDEC(QObject, Extension):
         tag_dim = cur_dict["dimensions"]
         tag_n_dim = cur_dict["dim"]
         tag_total_elements = self.count_elements(tag_dim)
-        acc_dict[tag_name] = [tag_total_elements, tag_dim, tag_n_dim]
+        if tag_total_elements < 100:
+            acc_dict[tag_name] = [tag_total_elements, tag_dim, tag_n_dim]
         return acc_dict
 
     def count_elements(self, dimensions) -> float:
@@ -198,21 +199,21 @@ class PluginUDEC(QObject, Extension):
     @pyqtSlot(str, result=list)
     def get_plc_info(self, ip) -> List[str]:
         with LogixDriver(ip, init__program_tags=True) as plc:
+            is_connected = plc.connected
             product_name = plc.info["product_name"]
             name = plc.info["name"]
-            programs = ""
+            programs = ""            
             for program in list(plc.info["programs"].keys()):
                 programs += str(program)
-            return [product_name, name, programs]
+            return [product_name, name, programs, is_connected]
 
     @pyqtSlot()
     def send_instructions(self):
-        print("----------------------------------------------------------------------------------------")
-        print("ENVIAR INSTRUCCIONES")
-        print("----------------------------------------------------------------------------------------")
         n_instructions = len(self.positions_list)
         with LogixDriver(self.ip) as plc:
             plc.write('Program:MainProgram.matrix_tag{' + str(n_instructions) +'}', self.positions_list)
+        self.set_message_params('i', 'Operacion finalizada', 'Las instrucciones fueron enviadas a la impresora. Puede monitorear el proceso en las pestañas adyacentes')
+        self.progress_end.emit()
 
     @pyqtSlot(float, float, float, float, float, float, float, float, float, float)
     def  generate_instructions_list(self, sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height):
@@ -239,9 +240,7 @@ class PluginUDEC(QObject, Extension):
                                                                     'correctos')
                 self.progress_end.emit()
                 return
-            self.set_message_params('i', 'Operacion finalizada', 'Se termino la generacion de instrucciones. Las '
-                                                                 'instrucciones fueron guardadas en el archivo '
-                                                                 'indicado')
+            self.set_message_params('i', 'Operacion finalizada', 'Finalizo la generacion de instrucciones. Puede enviarlas a la impresora una vez realizada la conexion')
             self.progress_end.emit()
 
     def flatten(self, list) -> List:
@@ -640,7 +639,7 @@ class PluginUDEC(QObject, Extension):
 
     @pyqtSlot(result=str)
     def get_message_content(self) -> str:
-        content = str(self.message_content.value)
+        content = self.message_content.value.decode(encoding = 'utf-8')
         content = content[2:-1]
         return content
 
@@ -652,9 +651,9 @@ class PluginUDEC(QObject, Extension):
 
     @pyqtSlot(str, str, str)
     def set_message_params(self, style, title, content) -> None:
-        self.message_style.value = bytes(style, 'utf-8')
-        self.message_title.value = bytes(title, 'utf-8')
-        self.message_content.value = bytes(content, 'utf-8')
+        self.message_style.value = style.encode(encoding = 'utf-8') #bytes(style, 'utf-8')
+        self.message_title.value = title.encode(encoding = 'utf-8') #bytes(title, 'utf-8')
+        self.message_content.value = content.encode(encoding = 'utf-8') #bytes(content, 'utf-8')
 
     @pyqtSlot()
     def show_message(self) -> None:
