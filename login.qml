@@ -70,20 +70,32 @@ Window {
     Component.onCompleted: {
             x = Screen.width / 2 - width / 2
             y = Screen.height / 2 - height / 2
+            frame.height = height - 60
+            frame.width = width - 50
 
             if (manager.look_for_gcode() == false){
                 login_tab.item.notify_gcode_status()
             }
         }
+    onWidthChanged: frame.width = width - 50
+    onHeightChanged: frame.height = height - 60
 
     Connections {
         target: manager
 
         function onProgressEnd() {
-            win.close()
+            //win.close()
             var mDialog = Qt.createComponent("MessageDialog.qml");
             win = mDialog.createObject(login_dialog)
             win.show()
+        }
+
+        function onProgressChanged(progress) {
+            login_tab.item.change_progress(progress)
+        }
+
+        function onProgressTotalChanged(total) {
+            login_tab.item.change_bar_total(total)
         }
     }
 
@@ -99,7 +111,7 @@ Window {
         width: 200;
         height: 30;
         enabled: connected
-        anchors.right: parent.right
+        anchors.right: start_printing.left
         anchors.rightMargin: 25;
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 10
@@ -110,8 +122,7 @@ Window {
         style: ButtonStyle{
             label: Image
             {
-                id: writeImage;
-                source: "./images/write.png";
+                source: "./images/send.png";
                 fillMode: Image.PreserveAspectFit;
                 horizontalAlignment: Image.AlignLeft;
             }
@@ -126,10 +137,42 @@ Window {
         }
     }
 
+    Button{
+        id: start_printing
+
+        width: 120;
+        height: 40;
+        enabled: connected
+        anchors.right: parent.right
+        anchors.rightMargin: 25;
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 10
+        onClicked:{
+            manager.send_instructions()
+        }
+
+        style: ButtonStyle{
+            label: Image
+            {
+                source: "./images/play.png";
+                fillMode: Image.PreserveAspectFit;
+                horizontalAlignment: Image.AlignLeft;
+            }
+        }
+        Text
+        {
+            text: qsTr("Iniciar \nimpresion")
+            horizontalAlignment: Text.AlignHCenter
+            color: start_printing.enabled ? "black":"darkgrey"
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+        }
+    }
+
     TabView {
         id: frame
-        height: parent.height - 50
-        width: parent.width -50
+
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
 
@@ -165,19 +208,45 @@ Window {
                 border.width: 1
 
                 function notify_gcode_status(){
-                    instructions_status_text.text = qsTr("No existe Gcode en el sistema. \nRebane una figura antes de intentar conectar a una impresora")
+                    instructions_status_text.text = qsTr("No existe Gcode en el sistema.\nRebane una figura primero.")
                     generate_instructions.enabled = false
+                }
+                function change_progress(progress) {
+                    progressBar.value = progress
+                }
+
+                function change_bar_total(total) {
+                    progressBar.maximumValue = total
+                }
+
+                Image {
+                    id: udecLogo
+                    source: "./images/udeclogo.jpg"
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.top: parent.top
+                    anchors.topMargin: 10
+                    width: 66
+                    height: 86
+
+                }
+
+                Text {
+                    id: udecText
+                    text: qsTr("Universidad de Concepción \n Departamento de ingenieria")
+                    anchors.left: udecLogo.right
+                    anchors.top:  udecLogo.top
                 }
 
                 ListModel{
                     id: plc_info_model
 
                     ListElement{
-                        name: "Nombre del dispositivo"
+                        name: "Nombre del \ndispositivo"
                         value: "-----------"
                     }
                     ListElement{
-                        name: "Nombre del controlador"
+                        name: "Nombre del \ncontrolador"
                         value: "-----------"
                     }
                     ListElement{
@@ -191,12 +260,23 @@ Window {
 
                     Rectangle{
                         border.width: 1
-                        width: 300
-                        height: childrenRect.height
-                        color: "oldlace"
+                        width: 100
+                        height: 40
+                        color: "lightgrey"
                         Text {
                             id: model_name
-                            text: name + ": " + value
+                            text: name + ": "
+                        }
+                        Rectangle{
+                            border.width: 1
+                            width: 250
+                            height: 40
+                            color: "lightgrey"
+                            anchors.left: parent.right
+                            Text {
+                                id: model_value
+                                text: value
+                            }
                         }
                     }
                 }
@@ -208,10 +288,10 @@ Window {
                     font.bold: true;
                     font.pointSize: 16;
                     font.pixelSize: 20;
-                    anchors.top: parent.top;
+                    anchors.top: udecLogo.bottom;
                     anchors.topMargin: 20;
                     anchors.left: parent.left;
-                    anchors.leftMargin: 100;
+                    anchors.leftMargin: 200;
                 }
 
                 ColumnLayout{
@@ -219,13 +299,21 @@ Window {
 
                     spacing: 30
                     anchors.horizontalCenter: login_title.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.top: login_title.bottom
+                    anchors.topMargin: 30
 
-                    Text{
-                        id: main_text
+                    Rectangle{
+                        width: 400
+                        height: 100
 
-                        text: qsTr("Para realizar la conexion por favor indique \nla dirección IP del PLC de la impresora.")
-                        wrapMode: main_text.WordWrap
+                        Text{
+                            id: main_text
+
+                            anchors.fill: parent
+                            text: qsTr("       Para comenzar rebane una figura, ingrese los parametros de la impresora destino y genere intrucciones.\n      Luego ingrese la direccion IP del controlador de la impresora y presione conectar. Despues presione enviar instrucciones e iniciar impresión.")
+                            wrapMode: Text.WordWrap
+                            horizontalAlignment: Text.AlignJustify
+                        }
                     }
 
                     Row{
@@ -233,6 +321,7 @@ Window {
 
                         height: 30
                         Layout.preferredWidth: 200
+                        Layout.alignment: Qt.AlignHCenter
 
                         Text{
                             id: field_Indicator
@@ -253,8 +342,26 @@ Window {
                     Button{
                         id: login_button
 
-                        text: qsTr("conectar")
+                        Layout.preferredWidth: 110
+                        Layout.preferredHeight: 30
                         enabled: false
+                        Layout.alignment: Qt.AlignHCenter
+                        style: ButtonStyle{
+                            label: Image {
+                                source: "./images/connect.png";
+                                fillMode: Image.PreserveAspectFit;
+                                horizontalAlignment: Image.AlignLeft;
+                            }
+                        }
+                        Text
+                        {
+                            text: qsTr("Conectar")
+                            color: login_button.enabled ? "black":"darkgrey"
+                            anchors.right: parent.right
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
                         onClicked: {
                             plc_path = ip_field.text
                             plc_info = manager.get_plc_info(plc_path)
@@ -262,7 +369,7 @@ Window {
                             plc_info_model.setProperty(0, "value", plc_info[0])
                             plc_info_model.setProperty(1, "value", plc_info[1])
                             plc_info_model.setProperty(2, "value", plc_info[2])
-                            monitoring_tab.item.load_tags()
+                            if (connected){monitoring_tab.item.load_tags()}
                         }
                     }
 
@@ -319,35 +426,62 @@ Window {
                         id: instructions_status
 
                         Layout.preferredWidth: frame.width/3
-                        Layout.preferredHeight: 50
+                        Layout.preferredHeight: 150
+                        color: "whitesmoke"
                         Layout.alignment: Qt.AlignHCenter
                         border.width: 1
 
                         Text{
                             id: instructions_status_text
 
-                            height: parent.height
-                            width: parent.width
+                            height: 30
+                            width: contentWidth
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.top: parent.top
+                            anchors.topMargin: 10
                             text: qsTr("No existen instrucciones en memeoria")
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.WordWrap
                         }
-                    }
-
-                    Button{
-                        id: generate_instructions
-
-                        Layout.preferredWidth: 150
-                        Layout.preferredHeight: 50
-                        Layout.alignment: Qt.AlignHCenter
-                        text: qsTr("Generar \n instrucciones")
-                        onClicked: {
-                            var component = Qt.createComponent("ProgressBar.qml");
-                            win = component.createObject(login_dialog);
-                            win.show();
-                            manager.generate_instructions_list(sb.paramText, sp.paramText, wb.paramText, wp.paramText, ub.paramText, up.paramText, armLen.paramText,
-                                                               printerH.paramText, radio.paramText, altura.paramText)
-                            login_button.enabled = true
+                        ProgressBar {
+                            id: progressBar
+                            width: parent.width - 100
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.top: instructions_status_text.bottom
+                            anchors.topMargin: 20
                         }
-                    }
+                        Button{
+                            id: generate_instructions
+
+                            width: parent.width - 100
+                            height: 50
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 10
+                            style: ButtonStyle{
+                                label: Image {
+                                    source: "./images/write.png";
+                                    fillMode: Image.PreserveAspectFit;
+                                    horizontalAlignment: Image.AlignLeft;
+                                }
+                            }
+                            Text
+                            {
+                                text: qsTr("Generar instrucciones")
+                                color: generate_instructions.enabled ? "black":"darkgrey"
+                                anchors.right: parent.right
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                font.bold: true
+                                font.pointSize: 14
+                            }
+                            onClicked: {
+                                manager.generate_instructions_list(sb.paramText, sp.paramText, wb.paramText, wp.paramText, ub.paramText, up.paramText, armLen.paramText,
+                                                                   printerH.paramText, radio.paramText, altura.paramText)
+                                login_button.enabled = true
+                            }
+                        }
+                    }                   
                 }
             }
         }
@@ -357,7 +491,7 @@ Window {
 
             title: "Monitoreo"
             active: true
-            enabled: connected
+            enabled: true
             Rectangle {
 
                 width: frame.width
@@ -381,6 +515,7 @@ Window {
                     id: tab_title
 
                     text: "Monitoreo de variables"
+                    z: 100
                     font.bold: true;
                     font.pointSize: 16;
                     font.pixelSize: 20;
@@ -390,102 +525,365 @@ Window {
 
                 }
 
-                ColumnLayout{
-                    id: combobox_column
+                Rectangle{
+                    id: chart_rect1
 
-                    spacing: 20
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.horizontalCenterOffset: -200
+                    border.width: 1
+                    width: parent.width/2
+                    height: parent.height/2 - 15
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.margins: 10
+                    color: "whitesmoke"
 
-                    ComboBox{
-                        id: tagbox_1
+                    RowLayout{
+                        id: combobox_row
 
-                        width: 400
-                        editable: true
-                        onActivated: {
-                            date_timer.running = true
-                            tagbox1_active = true
-                            chart.series(0).name = currentText
-                            chart.series(0).clear()
+                        spacing: 5
+                        anchors.horizontalCenter: chart.horizontalCenter
+                        anchors.top: chart.bottom
+
+                        ComboBox{
+                            id: tagbox_1
+
+                            width: 400
+                            editable: true
+                            onActivated: {
+                                date_timer.running = true
+                                tagbox1_active = true
+                                chart.series(0).name = currentText
+                                chart.series(0).clear()
+                            }
+                            TextField
+                            {
+                                id: tagbox_1_input
+
+                                width: parent.width;
+                                height: parent.height;
+                                placeholderText: qsTr("Ingrese valor");
+                                validator: RegExpValidator{ regExp: /\d{1,7}([.]\d{1,3})+$|\d{1,7}/ }
+                                anchors.top: parent.bottom
+                                anchors.topMargin: 5
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+
+                        ComboBox{
+                            id: tagbox_2
+
+                            width: 400
+                            editable: true
+                            onActivated: {
+                                date_timer.running = true
+                                tagbox2_active = true
+                                chart.series(1).name = currentText
+                                chart.series(1).clear()
+                            }
+                            TextField
+                            {
+                                id: tagbox_2_input
+
+                                width: parent.width;
+                                height: parent.height;
+                                placeholderText: qsTr("Ingrese valor");
+                                validator: RegExpValidator{ regExp: /\d{1,7}([.]\d{1,3})+$|\d{1,7}/ }
+                                anchors.top: parent.bottom
+                                anchors.topMargin: 5
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+
+                        ComboBox{
+                            id: tagbox_3
+
+                            width: 400
+                            editable: true
+                            onActivated: {
+                                date_timer.running = true
+                                tagbox3_active = true
+                                chart.series(2).name = currentText
+                                chart.series(2).clear()
+                            }
+                            TextField
+                            {
+                                id: tagbox_3_input
+
+                                width: parent.width;
+                                height: parent.height;
+                                placeholderText: qsTr("Ingrese valor");
+                                validator: RegExpValidator{ regExp: /\d{1,7}([.]\d{1,3})+$|\d{1,7}/ }
+                                anchors.top: parent.bottom
+                                anchors.topMargin: 5
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+
+                        ComboBox{
+                            id: tagbox_4
+
+                            width: 400
+                            editable: true
+                            onActivated: {
+                                date_timer.running = true
+                                tagbox4_active = true
+                                chart.series(3).name = currentText
+                                chart.series(3).clear()
+                            }
+                            TextField
+                            {
+                                id: tagbox_4_input
+
+                                width: parent.width;
+                                height: parent.height;
+                                placeholderText: qsTr("Ingrese valor");
+                                validator: RegExpValidator{ regExp: /\d{1,7}([.]\d{1,3})+$|\d{1,7}/ }
+                                anchors.top: parent.bottom
+                                anchors.topMargin: 5
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                onAccepted: {
+                                    manager.write_value(tagbox_4.currentText ,tagbox_4_input.text)
+                                }
+                            }
+                        }
+
+                    }
+
+
+
+                    ChartView {
+                        id: chart
+                        x: 180
+                        y: 90
+                        width: 540
+                        height: 250
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        backgroundColor: "whitesmoke"
+                        plotAreaColor: "white"
+
+                        ValueAxis{
+                            id: axisY
+                            min: 0
+                            max: 100
+                        }
+                        DateTimeAxis{
+                            id: time_axis
+
+                            format: "hh:mm.ss"
+                            min: new Date(new Date().getFullYear(), 1, 1, new Date().getHours(), new Date().getMinutes(), new Date().getSeconds())
+                            max: new Date()
+                            tickCount: 4
+                        }
+
+                    }
+
+                }
+                //----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                Rectangle{
+                    id: chart_rect2
+
+                    border.width: 1
+                    width: parent.width/2
+                    height: parent.height/2 - 15
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 10
+                    color: "whitesmoke"
+
+                    RowLayout{
+                        id: combobox_row2
+
+                        spacing: 5
+                        anchors.horizontalCenter: chart2.horizontalCenter
+                        anchors.top: chart2.bottom
+
+                        ComboBox{
+                            id: tagbox2_1
+
+                            width: 400
+                            editable: true
+                            onActivated: {
+                                date_timer.running = true
+                                tagbox1_active = true
+                                chart2.series(0).name = currentText
+                                chart2.series(0).clear()
+                            }
+                            TextField
+                            {
+                                id: tagbox2_1_input
+
+                                width: parent.width;
+                                height: parent.height;
+                                placeholderText: qsTr("Ingrese valor");
+                                validator: RegExpValidator{ regExp: /\d{1,7}([.]\d{1,3})+$|\d{1,7}/ }
+                                anchors.top: parent.bottom
+                                anchors.topMargin: 5
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+
+                        ComboBox{
+                            id: tagbox2_2
+
+                            width: 400
+                            editable: true
+                            onActivated: {
+                                date_timer.running = true
+                                tagbox2_active = true
+                                chart2.series(1).name = currentText
+                                chart2.series(1).clear()
+                            }
+                            TextField
+                            {
+                                id: tagbox2_2_input
+
+                                width: parent.width;
+                                height: parent.height;
+                                placeholderText: qsTr("Ingrese valor");
+                                validator: RegExpValidator{ regExp: /\d{1,7}([.]\d{1,3})+$|\d{1,7}/ }
+                                anchors.top: parent.bottom
+                                anchors.topMargin: 5
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+
+                        ComboBox{
+                            id: tagbox2_3
+
+                            width: 400
+                            editable: true
+                            onActivated: {
+                                date_timer.running = true
+                                tagbox3_active = true
+                                chart2.series(2).name = currentText
+                                chart2.series(2).clear()
+                            }                            TextField
+                            {
+                                id: tagbox2_3_input
+
+                                width: parent.width;
+                                height: parent.height;
+                                placeholderText: qsTr("Ingrese valor");
+                                validator: RegExpValidator{ regExp: /\d{1,7}([.]\d{1,3})+$|\d{1,7}/ }
+                                anchors.top: parent.bottom
+                                anchors.topMargin: 5
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+
+                        ComboBox{
+                            id: tagbox2_4
+
+                            width: 400
+                            editable: true
+                            onActivated: {
+                                date_timer.running = true
+                                tagbox4_active = true
+                                chart2.series(3).name = currentText
+                                chart2.series(3).clear()
+                            }
+                            TextField
+                            {
+                                id: tagbox2_4_input
+
+                                width: parent.width;
+                                height: parent.height;
+                                placeholderText: qsTr("Ingrese valor");
+                                validator: RegExpValidator{ regExp: /\d{1,7}([.]\d{1,3})+$|\d{1,7}/ }
+                                anchors.top: parent.bottom
+                                anchors.topMargin: 5
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
                         }
                     }
 
-                    ComboBox{
-                        id: tagbox_2
 
-                        width: 400
-                        editable: true
-                        onActivated: {
-                            date_timer.running = true
-                            tagbox2_active = true
-                            chart.series(1).name = currentText
-                            chart.series(1).clear()
+
+                    ChartView {
+                        id: chart2
+                        x: 180
+                        y: 90
+                        width: 540
+                        height: 250
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        backgroundColor: "whitesmoke"
+                        plotAreaColor: "white"
+
+                        ValueAxis{
+                            id: axisY2
+                            min: 0
+                            max: 100
                         }
-                    }
+                        DateTimeAxis{
+                            id: time_axis2
 
-                    ComboBox{
-                        id: tagbox_3
-
-                        width: 400
-                        editable: true
-                        onActivated: {
-                            date_timer.running = true
-                            tagbox3_active = true
-                            chart.series(2).name = currentText
-                            chart.series(2).clear()
+                            format: "hh:mm.ss"
+                            min: new Date(new Date().getFullYear(), 1, 1, new Date().getHours(), new Date().getMinutes(), new Date().getSeconds())
+                            max: new Date()
+                            tickCount: 4
                         }
-                    }
 
-                    ComboBox{
-                        id: tagbox_4
-
-                        width: 400
-                        editable: true
-                        onActivated: {
-                            date_timer.running = true
-                            tagbox4_active = true
-                            chart.series(3).name = currentText
-                            chart.series(3).clear()
-                        }
                     }
 
                 }
 
+                Rectangle{
+                    id: progress_status
 
+                    width: frame.width/2 - 50
+                    height: 150
+                    color: "whitesmoke"
+                    border.width: 1
+                    anchors.bottom: parent.bottom
+                    anchors.right: parent.right
+                    anchors.margins: 20
 
-                ChartView {
-                    id: chart
-                    x: 180
-                    y: 90
-                    width: 500
-                    height: 300
-                    anchors.left: combobox_column.right
-                    anchors.leftMargin: 30
-                    anchors.verticalCenter: combobox_column.verticalCenter
+                    Text{
+                        id: progress_text
 
-                    ValueAxis{
-                        id: axisY
-                        min: 0
-                        max: 100
+                        height: 30
+                        width: contentWidth
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                        anchors.topMargin: 10
+                        font.pointSize: 14
+                        text: qsTr("Porcentaje completado:")
+                        horizontalAlignment: Text.AlignHCenter
                     }
-                    DateTimeAxis{
-                        id: time_axis
+                    Text{
+                        id: percentage_text
 
-                        format: "hh:mm.ss"
-                        min: new Date(new Date().getFullYear(), 1, 1, new Date().getHours(), new Date().getMinutes(), new Date().getSeconds())
-                        max: new Date()
-                        tickCount: 4
+                        height: 30
+                        width: contentWidth
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: progress_text.top
+                        anchors.topMargin: 40
+                        text: qsTr("XX %")
+                        font.bold: true
+                        font.pointSize: 14
+                        horizontalAlignment: Text.AlignHCenter
                     }
-
+                    ProgressBar {
+                        id: process_progressBar
+                        width: parent.width - 100
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: percentage_text.bottom
+                        anchors.topMargin: 20
+                    }
                 }
 
                 Component.onCompleted: {
                     console.log("Se ha iniciado QML\n")
                     var series1 = chart.createSeries(ChartView.SeriesTypeLine,"tag 1",time_axis,axisY)
-                    var series2 = chart.createSeries(ChartView.SeriesTypeLine,"tag 1",time_axis,axisY)
-                    var series3 = chart.createSeries(ChartView.SeriesTypeLine,"tag 1",time_axis,axisY)
-                    var series4 = chart.createSeries(ChartView.SeriesTypeLine,"tag 1",time_axis,axisY)
+                    var series2 = chart.createSeries(ChartView.SeriesTypeLine,"tag 2",time_axis,axisY)
+                    var series3 = chart.createSeries(ChartView.SeriesTypeLine,"tag 3",time_axis,axisY)
+                    var series4 = chart.createSeries(ChartView.SeriesTypeLine,"tag 4",time_axis,axisY)
+
+                    var series5 = chart2.createSeries(ChartView.SeriesTypeLine,"tag 5",time_axis2,axisY2)
+                    var series6 = chart2.createSeries(ChartView.SeriesTypeLine,"tag 6",time_axis2,axisY2)
+                    var series7 = chart2.createSeries(ChartView.SeriesTypeLine,"tag 7",time_axis2,axisY2)
+                    var series8 = chart2.createSeries(ChartView.SeriesTypeLine,"tag 8",time_axis2,axisY2)
                 }
 
                 Timer{
@@ -534,11 +932,192 @@ Window {
             }
         }
         Tab {
-            title: "3rd page"
+            id: control_tab
+
+            title: "Control"
+            active: true
+            enabled: true
             Rectangle {
-                color: "green"
                 width: frame.width
                 height: frame.height
+                border.width: 1
+
+                Text{
+                    id: control_title
+
+                    text: "Control de movimiento del efector";
+                    font.bold: true;
+                    font.pointSize: 16;
+                    font.pixelSize: 20;
+                    anchors.top: parent.top;
+                    anchors.topMargin: 20;
+                    anchors.left: parent.left;
+                    anchors.leftMargin: 150;
+                }
+
+                Rectangle{
+                    id: crossreference
+                    width: 80
+                    height: 80
+                    anchors.verticalCenter: zreference.verticalCenter
+                    anchors.left: zreference.right
+                    anchors.leftMargin: 150
+                }
+
+                ArrowButtons{id: right; anchors.left: crossreference.right; anchors.top: crossreference.top; transform: Rotation{origin.x: 0; origin.y: 0; angle: 0}}
+                             //lowButton.onClicked: {crossreference.width = crossreference.width+10}
+                             //highButton.onClicked: {crossreference.width = crossreference.width-10}}
+                ArrowButtons{id: upup; anchors.left: crossreference.left; anchors.top: crossreference.top ; transform: Rotation{origin.x: 0; origin.y: 0; angle: 270}}
+                ArrowButtons{id: down; anchors.top: crossreference.bottom; anchors.left: crossreference.right ; transform: Rotation{origin.x: 0; origin.y: 0; angle: 90}}
+                ArrowButtons{id: left;  anchors.top: crossreference.bottom ; anchors.left: crossreference.left ; transform: Rotation{origin.x: 0; origin.y: 0; angle: 180}}
+
+                Rectangle{
+                    id: zreference
+                    width: 80
+                    height: 80
+                    anchors.left: parent.left
+                    anchors.leftMargin: 100
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                ArrowButtons{id: zup; anchors.left: zreference.left; anchors.top: zreference.top ; transform: Rotation{origin.x: 0; origin.y: 0; angle: 270}}
+                ArrowButtons{id: zdown; anchors.top: zreference.bottom; anchors.left: zreference.right ; transform: Rotation{origin.x: 0; origin.y: 0; angle: 90}}
+
+                RowLayout{
+                    spacing: 30
+                    anchors.horizontalCenter: make_move.horizontalCenter
+                    anchors.bottom: make_move.top
+                    anchors.bottomMargin: 20
+                    ParamArea{id: eje_x; name: "Eje X"; help: " Indique un valor entre -225 y 225 "; helpSide: "below"; input.width: 100}
+                    ParamArea{id: eje_y; name: "Eje Y"; help: " Indique un valor entre -225 y 225 "; helpSide: "below"; input.width: 100}
+                    ParamArea{id: eje_z; name: "Eje Z"; help: " Indique un valor entre 0 y 500 "; helpSide: "below"; input.width: 100}
+                }
+
+                Button{
+                    id: make_move
+
+                    width: 250
+                    height: 50
+                    anchors.horizontalCenter: control_title.horizontalCenter
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 10
+                    style: ButtonStyle{
+                        label: Image {
+                            source: "./images/move.png";
+                            fillMode: Image.PreserveAspectFit;
+                            horizontalAlignment: Image.AlignLeft;
+                        }
+                    }
+                    Text
+                    {
+                        text: qsTr("Realizar movimiento")
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        font.bold: true
+                        font.pointSize: 14
+                    }
+                }
+
+                Rectangle{
+                    id: utilities
+                    width: frame.width/2 - 200
+                    height: 430
+                    anchors.right: parent.right
+                    anchors.rightMargin: 30
+                    anchors.verticalCenter: parent.verticalCenter
+                    border.width: 1
+                    color: "whitesmoke"
+
+                    Text {
+                        id: utilities_title
+                        text: "Funciones utiles";
+                        font.bold: true;
+                        font.pointSize: 16;
+                        font.pixelSize: 20;
+                        anchors.top: parent.top;
+                        anchors.topMargin: 20;
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+
+                    ColumnLayout{
+                        spacing: 50
+                        anchors.top: utilities_title.bottom
+                        anchors.topMargin: 30
+                        anchors.horizontalCenter: parent.horizontalCenter
+
+                        Button{
+                            id: move_home
+
+                            Layout.preferredWidth: 250
+                            Layout.preferredHeight: 50
+                            Layout.alignment: Qt.AlignHCenter
+                            style: ButtonStyle{
+                                label: Image {
+                                    source: "./images/home.png";
+                                    fillMode: Image.PreserveAspectFit;
+                                    horizontalAlignment: Image.AlignLeft;
+                                }
+                            }
+                            Text
+                            {
+                                text: qsTr("Volver al origen")
+                                anchors.right: parent.right
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                font.bold: true
+                                font.pointSize: 14
+                            }
+                        }
+                        Button{
+                            id: pause_printing
+
+                            Layout.preferredWidth: 250
+                            Layout.preferredHeight: 50
+                            Layout.alignment: Qt.AlignHCenter
+                            style: ButtonStyle{
+                                label: Image {
+                                    source: "./images/pause.png";
+                                    fillMode: Image.PreserveAspectFit;
+                                    horizontalAlignment: Image.AlignLeft;
+                                }
+                            }
+                            Text
+                            {
+                                text: qsTr("Pausar impresion")
+                                anchors.right: parent.right
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                font.bold: true
+                                font.pointSize: 14
+                            }
+                        }
+                        Button{
+                            id: stop_printing
+
+                            Layout.preferredWidth: 250
+                            Layout.preferredHeight: 50
+                            Layout.alignment: Qt.AlignHCenter
+                            style: ButtonStyle{
+                                label: Image {
+                                    source: "./images/warning.png";
+                                    fillMode: Image.PreserveAspectFit;
+                                    horizontalAlignment: Image.AlignLeft;
+                                }
+                            }
+                            Text
+                            {
+                                text: qsTr("Detener impresion")
+                                anchors.right: parent.right
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                font.bold: true
+                                font.pointSize: 14
+                            }
+                        }
+                        ParamArea{id: max_speed; name: "Velocidad max.\ndel efector"; helpSide: "below"; Layout.alignment: Qt.AlignRight}
+                    }
+                }
             }
         }
     }

@@ -1,3 +1,3 @@
 {
-    "files": ["plugin.json","main.qml","MessageDialog.qml","PluginUDEC.py","ParamArea.qml","ProgressBar.qml","login.qml"]
+    "files": ["PluginUDEC.py","ParamArea.qml","MessageDialog.qml","plugin.json","ProgressBar.qml","login.qml","main.qml","ArrowButtons.qml"]
 }

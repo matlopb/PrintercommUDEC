@@ -9,6 +9,7 @@ Item
     property alias paramText: paramfield.text
     property alias help: helpText.text
     property string helpSide: ""
+    property alias input: paramfield
     width: 140;
     height: 25;
 
@@ -41,9 +42,12 @@ Item
         border.width: 1;
         color: "#fffaf0";
         anchors.margins: 20
-        anchors.verticalCenter: paramfield.verticalCenter
+        anchors.verticalCenter: (helpSide == "left" || "right") ? paramfield.verticalCenter : undefined
+        anchors.horizontalCenter: (helpSide == "below" || "above") ? paramfield.horizontalCenter : undefined
         anchors.right: (helpSide == "left") ? paramfield.left : undefined
         anchors.left: (helpSide == "rigth") ? paramfield.right : undefined
+        anchors.top: (helpSide == "below") ? paramfield.bottom : undefined
+        anchors.bottom: (helpSide == "above") ? paramfield.top : undefined
         visible: paramfield.hovered;
         z: 100;
 
@@ -55,6 +59,4 @@ Item
             anchors.fill: parent;
         }
     }
-
-
 }

@@ -143,10 +143,7 @@ class PluginUDEC(QObject, Extension):
         tag_names = []
         values = []
         for tag in tag_list:
-            print("tag list:", tag_list)
-            print("tag:", tag)
             tag_name = tag.split('[')[0]
-            print("tag name:", tag_name)
             tag_dim = self.tag_dict[tag][1]
             tag_n_dim = self.tag_dict[tag][2]
             if tag_dim == 1:
@@ -159,14 +156,11 @@ class PluginUDEC(QObject, Extension):
 
         plc = LogixDriver(ip)
         n_tags = len(tag_names)
-        print("tag names:", tag_names)
         plc.open()
         tag_read = plc.read(*tag_names)
         plc.close()
-        print("tag read is:", tag_read)
         if n_tags > 1:
             for element in tag_read:
-                print("element is:", element)
                 tag_value = element.value
                 if tag_value is True:
                     tag_value = 1
@@ -198,21 +192,27 @@ class PluginUDEC(QObject, Extension):
 
     @pyqtSlot(str, result=list)
     def get_plc_info(self, ip) -> List[str]:
-        with LogixDriver(ip, init__program_tags=True) as plc:
-            is_connected = plc.connected
-            product_name = plc.info["product_name"]
-            name = plc.info["name"]
-            programs = ""            
-            for program in list(plc.info["programs"].keys()):
-                programs += str(program)
-            return [product_name, name, programs, is_connected]
+        try:
+            with LogixDriver(ip, init__program_tags=True) as plc:
+                is_connected = plc.connected
+                product_name = plc.info["product_name"]
+                name = plc.info["name"]
+                programs = ""
+                for program in list(plc.info["programs"].keys()):
+                    programs += str(program)
+                return [product_name, name, programs, is_connected]
+        except:
+            self.set_message_params('e', 'Se produjo un error', 'Se ha producido un error de conexion. Por favor '
+                                                                'revise que la direccion IP sea la correcta.')
+            self.progress_end.emit()
+            return ["-----------", "-----------", "-----------", False]
 
     @pyqtSlot()
     def send_instructions(self):
         n_instructions = len(self.positions_list)
         with LogixDriver(self.ip) as plc:
             plc.write('Program:MainProgram.matrix_tag{' + str(n_instructions) +'}', self.positions_list)
-        self.set_message_params('i', 'Operacion finalizada', 'Las instrucciones fueron enviadas a la impresora. Puede monitorear el proceso en las pestañas adyacentes')
+        self.set_message_params('i', 'Operacion finalizada', 'Las instrucciones fueron enviadas a la impresora. Puede monitorear el proceso en las pantallas adyacentes')
         self.progress_end.emit()
 
     @pyqtSlot(float, float, float, float, float, float, float, float, float, float)
@@ -237,10 +237,10 @@ class PluginUDEC(QObject, Extension):
             except ValueError:
                 self.set_message_params('e', 'Se produjo un error', 'Se ha producido un error de calculo. Por favor '
                                                                     'revise que los datos de impresora esten '
-                                                                    'correctos')
+                                                                    'correctos.')
                 self.progress_end.emit()
                 return
-            self.set_message_params('i', 'Operacion finalizada', 'Finalizo la generacion de instrucciones. Puede enviarlas a la impresora una vez realizada la conexion')
+            self.set_message_params('i', 'Operacion finalizada', 'Finalizo la generacion de instrucciones. Puede enviarlas a la impresora una vez realizada la conexion.')
             self.progress_end.emit()
 
     def flatten(self, list) -> List:
@@ -255,20 +255,40 @@ class PluginUDEC(QObject, Extension):
             return False
         return True
 
-# ----------------------------------------------------------------------------------------------------
-    @pyqtSlot(str, result=str)
-    def write_matrix(self, ip) -> str:
-        with LogixDriver(ip, init__program_tags=True) as plc:
-            plc.write('Program:MainProgram.matrix_tag{1200}', self.generate_matrix(1200))
-            print('--------------------------------------------------')
-            print('DONE')
-            print('--------------------------------------------------')
+    def get_list_names(self, tag_list) ->List[str]:
+        for tag in tag_list:
+            tag_name = tag.split('[')[0]
+            tag_dim = self.tag_dict[tag][1]
+            tag_n_dim = self.tag_dict[tag][2]
+            if tag_dim == 1:
+                tag_names.append('Program:MainProgram.' + tag_name)
+            elif tag_n_dim == 2:
+                tag_names.append('Program:MainProgram.' + tag)
+            else:
+                tag_element = self.tag_dict[tag][0]
+                tag_names.append('Program:MainProgram.' + tag_name + "["+str(tag_element)+"]")
 
-    def generate_matrix(self, number) -> List[float]:
-        element_list = []
-        for i in range(number):
-            element_list.append(random.random()*100)
-        return element_list
+    def extract_tag_name(self, tag) ->str:
+        tag_name = tag.split('[')[0]
+        tag_dim = self.tag_dict[tag][1]
+        tag_n_dim = self.tag_dict[tag][2]
+        if tag_dim == 1:
+            extracted_name = 'Program:MainProgram.' + tag_name
+        elif tag_n_dim == 2:
+            extracted_name = 'Program:MainProgram.' + tag
+        else:
+            tag_element = self.tag_dict[tag][0]
+            extracted_name = 'Program:MainProgram.' + tag_name + "["+str(tag_element)+"]"
+        return extracted_name
+
+    @pyqtSlot(str, int)
+    def write_value(self, tag_name, new_value):
+        tag_valid_name = self.extract_tag_name(tag_name)
+        with LogixDriver (self.ip) as plc:
+            plc.write(tag_valid_name, new_value)
+
+# ----------------------------------------------------------------------------------------------------
+
 # -----------------------------------------------------------------------------------------------------
 
     @pyqtSlot(str)
@@ -292,24 +312,19 @@ class PluginUDEC(QObject, Extension):
         """Responsible for using the given parameters to call the functions which calculate the instructions and
         then write them in a L5K file."""
 
-        print("SE INICIO EL PROCESO GENERATEPOSITIONS ASYNC")
         params = [sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height]
         print(str(params))
         file_params = [file_path, overwrite, destination_path, dir_path]
         if self.are_valid(params, file_params) is False:
-            print("ERROR DE VALIDACION")
             self.progress_end.emit()
             self.end_flag.value = False
             return
-        print("PAAMETROS VALIDOS")
         coordinates = self.get_coordinates(self.split_lines(self.get_gcode()))
-        print("SE OBTUVIERON LAS COORDENADAS")
         if self.check_ws(ws_radio, ws_height, coordinates):
             ws_coordinates = self.z_bias(coordinates, float(height))
             parameters = [sb, sp, wb, wp, ub, up, arm_length, ws_radio]
             try:
                 self.inv_kin_problem(ws_coordinates, parameters)
-                print("SE CALCULO EL PROBLEMA INVERSO")
             except ValueError:
                 self.set_message_params('e', 'Se produjo un error', 'Se ha producido un error de calculo. Por favor '
                                                                     'revise que los datos de impresora esten '
@@ -319,13 +334,9 @@ class PluginUDEC(QObject, Extension):
                 return
             self.generateInstructions(file_path, overwrite, self.positions_list, destination_path)
             self.end_flag.value = False
-            print(
-                "#################################################################################################################################"
-                "###################################################################################################################################")
             self.set_message_params('i', 'Operacion finalizada', 'Se termino la generacion de instrucciones. Las '
                                                                  'instrucciones fueron guardadas en el archivo '
                                                                  'indicado')
-            print("DE FIN DE PROCESO")
             self.progress_end.emit()
 
     @pyqtSlot(float, float, float, float, float, float, float, float, float, float, str, bool, str, str)
@@ -639,7 +650,7 @@ class PluginUDEC(QObject, Extension):
 
     @pyqtSlot(result=str)
     def get_message_content(self) -> str:
-        content = self.message_content.value.decode(encoding = 'utf-8')
+        content = str(self.message_content.value)
         content = content[2:-1]
         return content
 
