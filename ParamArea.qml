@@ -42,10 +42,10 @@ Item
         border.width: 1;
         color: "#fffaf0";
         anchors.margins: 20
-        anchors.verticalCenter: (helpSide == "left" || "right") ? paramfield.verticalCenter : undefined
-        anchors.horizontalCenter: (helpSide == "below" || "above") ? paramfield.horizontalCenter : undefined
+        anchors.verticalCenter: (helpSide == "left" || helpSide == "right") ? paramfield.verticalCenter : undefined
+        anchors.horizontalCenter: (helpSide == "below" || helpSide == "above") ? paramfield.horizontalCenter : undefined
         anchors.right: (helpSide == "left") ? paramfield.left : undefined
-        anchors.left: (helpSide == "rigth") ? paramfield.right : undefined
+        anchors.left: (helpSide == "right") ? paramfield.right : undefined
         anchors.top: (helpSide == "below") ? paramfield.bottom : undefined
         anchors.bottom: (helpSide == "above") ? paramfield.top : undefined
         visible: paramfield.hovered;

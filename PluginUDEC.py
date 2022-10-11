@@ -21,10 +21,6 @@ from UM.PluginRegistry import PluginRegistry
 from UM.i18n import i18nCatalog
 from cura.CuraApplication import CuraApplication
 from .pycomm3.pycomm3 import LogixDriver
-#from pycomm3 import LogixDriver
-from .matplotlib_backend_qtquick.backend_qtquick import NavigationToolbar2QtQuick
-from .matplotlib_backend_qtquick.backend_qtquickagg import FigureCanvasQtQuickAgg
-from .matplotlib_backend_qtquick.qt_compat import QtGui, QtQml, QtCore
 
 import os
 
@@ -59,9 +55,9 @@ class PluginUDEC(QObject, Extension):
 
         self.setMenuName(i18n_catalog.i18nc("@item:inmenu", "Plugin UDEC"))
         self.addMenuItem(i18n_catalog.i18nc("@item:inmenu", "Generar archivo RSLogix"), self.show_popup)
-        self.addMenuItem(i18n_catalog.i18nc("@item:inmenu", "Conectar impresora"), self.show_login)
+        self.addMenuItem(i18n_catalog.i18nc("@item:inmenu", "Conectar impresora"), self.show_connect)
         self._view = None
-        self.login_view = None
+        self.connect_view = None
         self.message_view = None
         self.positions_list = []
         self.saved_value = 0
@@ -74,17 +70,25 @@ class PluginUDEC(QObject, Extension):
         #self.worker.file_changed.connect(self.file_changed)
         #self.worker_thread = QThread()
         #self.worker.moveToThread(self.worker_thread)
-        #self.worker_thread.start()        
+        #self.worker_thread.start()
 
     @pyqtSlot(str, result=list)
     def plc_tag_list(self, ip) -> List[str]:
+        """Gets the list of program tagsand returns a list containing the names of all tags
+        with less than 100 elements"""
+
         self.ip = ip
         plc = LogixDriver(ip, init__program_tags=True)
         plc.open()
         tag_list = plc.get_tag_list('Program:MainProgram').copy()
+        tag_name_list = self.get_names(self.get_tags_info(tag_list))
+        plc.close()
+        return tag_name_list
+
+    def get_names(self, tag_list) -> List[str]:
         tag_name_list = []
         element_number = 0
-        tags_info_dict = self.get_tags_info(tag_list) # returns names and dimensions
+        tags_info_dict = tag_list
 
         for name in tags_info_dict:
             tag_elements_name = self.get_tag_elements(name.replace("Program:MainProgram.",''), tags_info_dict[name][1])
@@ -93,7 +97,6 @@ class PluginUDEC(QObject, Extension):
                 self.tag_dict[element] = [element_number, tags_info_dict[name][0], tags_info_dict[name][2]]
                 element_number += 1
             element_number = 0
-        plc.close()
         return tag_name_list
 
     def get_tags_info(self, tag_list) -> dict:
@@ -138,10 +141,8 @@ class PluginUDEC(QObject, Extension):
                         tag_list.append(tag_name+"["+str(i)+"]"+"["+str(j)+"]"+"["+str(k)+"]")
         return tag_list
 
-    @pyqtSlot(list, str, result = list)
-    def update_series(self, tag_list, ip) -> List[float]:
+    def extract_names(self, tag_list) -> List:
         tag_names = []
-        values = []
         for tag in tag_list:
             tag_name = tag.split('[')[0]
             tag_dim = self.tag_dict[tag][1]
@@ -153,14 +154,12 @@ class PluginUDEC(QObject, Extension):
             else:
                 tag_element = self.tag_dict[tag][0]
                 tag_names.append('Program:MainProgram.' + tag_name + "["+str(tag_element)+"]")
+        return tag_names
 
-        plc = LogixDriver(ip)
-        n_tags = len(tag_names)
-        plc.open()
-        tag_read = plc.read(*tag_names)
-        plc.close()
-        if n_tags > 1:
-            for element in tag_read:
+    def extract_values(self, tag_list, number_of_elements) -> List:
+        values = []
+        if number_of_elements > 1:
+            for element in tag_list:
                 tag_value = element.value
                 if tag_value is True:
                     tag_value = 1
@@ -168,7 +167,7 @@ class PluginUDEC(QObject, Extension):
                     tag_value = 0
                 values.append(tag_value)
         else:
-            tag_value = tag_read.value
+            tag_value = tag_list.value
             if tag_value is True:
                 tag_value = 1
             elif tag_value is False:
@@ -176,22 +175,36 @@ class PluginUDEC(QObject, Extension):
             values.append(tag_value)
         return values
 
+    @pyqtSlot(list, str, result=list)
+    def update_series(self, tag_list, ip) -> List[float]:
+        """Reads the values of the tags in tag_list from the device associated with
+        the given IP address"""
+
+        tag_names = self.extract_names(tag_list)
+        plc = LogixDriver(ip)
+        n_tags = len(tag_names)
+        plc.open()
+        tag_read = plc.read(*tag_names)
+        plc.close()
+        values = self.extract_values(tag_read, n_tags)
+        return values
+
     @pyqtSlot(str)
     def save_value(self, ip):
         with LogixDriver(ip) as plc:
             self.new_value = plc.read('Program:MainProgram.array_tag{3}').value[0]
 
-    def show_login(self):
+    def show_connect(self):
         """Displays an error message with the given title and message"""
 
-        self.create_view("login.qml")
-        if self.login_view is None:
-            Logger.log("e", "Not creating login window since the QML component failed to be created.")
+        self.create_view("Connect.qml")
+        if self.connect_view is None:
+            Logger.log("e", "Not creating Connect window since the QML component failed to be created.")
             return
-        self.login_view.show()
+        self.connect_view.show()
 
     @pyqtSlot(str, result=list)
-    def get_plc_info(self, ip) -> List[str]:
+    def plc_info(self, ip) -> List[str]:
         try:
             with LogixDriver(ip, init__program_tags=True) as plc:
                 is_connected = plc.connected
@@ -200,10 +213,12 @@ class PluginUDEC(QObject, Extension):
                 programs = ""
                 for program in list(plc.info["programs"].keys()):
                     programs += str(program)
-                return [product_name, name, programs, is_connected]
+            return [product_name, name, programs, is_connected]
         except:
-            self.set_message_params('e', 'Se produjo un error', 'Se ha producido un error de conexion. Por favor '
-                                                                'revise que la direccion IP sea la correcta.')
+            self.set_message_params('e', 'Se produjo un error',
+                                    'Se ha producido un error de conexion. '
+                                    'Por favor revise que la direccion IP sea '
+                                    'la correcta.')
             self.progress_end.emit()
             return ["-----------", "-----------", "-----------", False]
 
@@ -211,36 +226,42 @@ class PluginUDEC(QObject, Extension):
     def send_instructions(self):
         n_instructions = len(self.positions_list)
         with LogixDriver(self.ip) as plc:
-            plc.write('Program:MainProgram.matrix_tag{' + str(n_instructions) +'}', self.positions_list)
-        self.set_message_params('i', 'Operacion finalizada', 'Las instrucciones fueron enviadas a la impresora. Puede monitorear el proceso en las pantallas adyacentes')
+            plc.write('Program:MainProgram.matrix_tag{'+str(n_instructions)+'}',
+                      self.positions_list)
+        self.set_message_params('i', 'Operacion finalizada',
+                                'Las instrucciones fueron enviadas a la '
+                                'impresora. Puede monitorear el proceso en '
+                                'las pantallas adyacentes')
         self.progress_end.emit()
 
     @pyqtSlot(float, float, float, float, float, float, float, float, float, float)
-    def  generate_instructions_list(self, sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height):
+    def generate_instructions_list(self, sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height):
         """Responsible for using the given parameters to call the functions which calculate the instructions and
         then write them in a L5K file."""
 
         params = [sb, sp, wb, wp, ub, up, arm_length, height, ws_radio, ws_height]
-        if self.are_valid(params) is False:
-            print("ERROR DE VALIDACION")
+        if not self.are_valid(params):
             Logger.log("e", "Some parameters ")
             self.progress_end.emit()
             return
         coordinates = self.get_coordinates(self.split_lines(self.get_gcode()))
-        if self.check_ws(ws_radio, ws_height, coordinates):
+        if self.fits_in_ws(ws_radio, ws_height, coordinates):
             ws_coordinates = self.z_bias(coordinates, float(height))
-            parameters = [sb, sp, wb, wp, ub, up, arm_length]
+            #parameters = [sb, sp, wb, wp, ub, up, arm_length]
             try:
-                self.inv_kin_problem(ws_coordinates, parameters)
+                self.inv_kin_problem(ws_coordinates, params)
                 self.positions_list = self.flatten(self.positions_list)
-                print(self.positions_list, "THE TOTAL LENGTH IS:", len(self.positions_list))
             except ValueError:
-                self.set_message_params('e', 'Se produjo un error', 'Se ha producido un error de calculo. Por favor '
-                                                                    'revise que los datos de impresora esten '
-                                                                    'correctos.')
+                self.set_message_params('e', 'Se produjo un error',
+                                        'Se ha producido un error de calculo. '
+                                        '0Por favor revise que los datos de '
+                                        'impresora esten correctos.')
                 self.progress_end.emit()
                 return
-            self.set_message_params('i', 'Operacion finalizada', 'Finalizo la generacion de instrucciones. Puede enviarlas a la impresora una vez realizada la conexion.')
+            self.set_message_params('i', 'Operacion finalizada',
+                                    'Finalizo la generacion de instrucciones. '
+                                    'Puede enviarlas a la impresora una vez '
+                                    'realizada la conexion.')
             self.progress_end.emit()
 
     def flatten(self, list) -> List:
@@ -255,7 +276,8 @@ class PluginUDEC(QObject, Extension):
             return False
         return True
 
-    def get_list_names(self, tag_list) ->List[str]:
+    def get_list_names(self, tag_list) -> List[str]:
+        tag_names = []
         for tag in tag_list:
             tag_name = tag.split('[')[0]
             tag_dim = self.tag_dict[tag][1]
@@ -320,7 +342,7 @@ class PluginUDEC(QObject, Extension):
             self.end_flag.value = False
             return
         coordinates = self.get_coordinates(self.split_lines(self.get_gcode()))
-        if self.check_ws(ws_radio, ws_height, coordinates):
+        if self.fits_in_ws(ws_radio, ws_height, coordinates):
             ws_coordinates = self.z_bias(coordinates, float(height))
             parameters = [sb, sp, wb, wp, ub, up, arm_length, ws_radio]
             try:
@@ -377,7 +399,7 @@ class PluginUDEC(QObject, Extension):
                     return False
         return True
 
-    def check_ws(self, radio, height, coordinates) -> bool:
+    def fits_in_ws(self, radio, height, coordinates) -> bool:
         """Checks if the given coordinates fit in the working space"""
 
         for element in coordinates:
@@ -625,13 +647,13 @@ class PluginUDEC(QObject, Extension):
                 return
             Logger.log("d", "Message view created.")
 
-        if view == "login.qml":
-            self.login_view = CuraApplication.getInstance().createQmlComponent(path, {"manager": self})
-            if self.login_view is None:
+        if view == "Connect.qml":
+            self.connect_view = CuraApplication.getInstance().createQmlComponent(path, {"manager": self})
+            if self.connect_view is None:
                 Logger.log("e",
-                           "Not creating login window since the message view variable is empty.")
+                           "Not creating Connect window since the message view variable is empty.")
                 return
-            Logger.log("d", "login view created.")
+            Logger.log("d", "Connect view created.")
 
     def show_popup(self) -> None:
         """Show the GUI of the UDEC Plugin."""
