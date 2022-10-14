@@ -10,6 +10,7 @@ Item
     property alias help: helpText.text
     property string helpSide: ""
     property alias input: paramfield
+    property alias placeholder: paramfield.placeholderText
     width: 140;
     height: 25;
 
@@ -37,8 +38,8 @@ Item
     {
         id: helpZone;
 
-        width: helpText.contentWidth;
-        height: helpText.contentHeight;
+        width: helpText.contentWidth+10;
+        height: helpText.contentHeight+5;
         border.width: 1;
         color: "#fffaf0";
         anchors.margins: 20
@@ -48,15 +49,13 @@ Item
         anchors.left: (helpSide == "right") ? paramfield.right : undefined
         anchors.top: (helpSide == "below") ? paramfield.bottom : undefined
         anchors.bottom: (helpSide == "above") ? paramfield.top : undefined
-        visible: paramfield.hovered;
+        visible: (help == "") ? false : paramfield.hovered;
         z: 100;
 
         Text
         {
             id: helpText;
-
-            text: help;
-            anchors.fill: parent;
+            anchors.centerIn: parent
         }
     }
 }

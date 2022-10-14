@@ -6,6 +6,7 @@ import QtQuick.Controls.Styles 1.4
 Item {
     property alias lowButton: xplus1
     property alias highButton: xplus10
+    property int rotation: 0
     Button{
         id: xplus1
 
@@ -17,6 +18,16 @@ Item {
                 fillMode: Image.PreserveAspectFit;
                 horizontalAlignment: Image.AlignLeft;
             }
+        }
+        Text {
+            id: amount1
+            text: qsTr("+1")
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.rightMargin: 5
+            anchors.topMargin: 5
+            font.bold: true
+            transform: Rotation{origin.x: amount1.width/2; origin.y: amount1.height/2; angle: -rotation}
         }
     }
     Button{
@@ -32,6 +43,16 @@ Item {
                 fillMode: Image.PreserveAspectFit;
                 horizontalAlignment: Image.AlignLeft;
             }
+        }
+        Text {
+            id: amount10
+            text: qsTr("+10")
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.rightMargin: 2
+            anchors.topMargin: 5
+            font.bold: true
+            transform: Rotation{origin.x: amount10.width/2; origin.y: amount10.height/2; angle: -rotation}
         }
     }
 }
