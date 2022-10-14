@@ -231,7 +231,7 @@ class PluginUDEC(QObject, Extension):
         self.set_message_params('i', 'Operacion finalizada',
                                 'Las instrucciones fueron enviadas a la '
                                 'impresora. Puede monitorear el proceso en '
-                                'las pantallas adyacentes')
+                                'las pantallas adyacentes.')
         self.progress_end.emit()
 
     @pyqtSlot(float, float, float, float, float, float, float, float, float, float)
@@ -350,7 +350,7 @@ class PluginUDEC(QObject, Extension):
             except ValueError:
                 self.set_message_params('e', 'Se produjo un error', 'Se ha producido un error de calculo. Por favor '
                                                                     'revise que los datos de impresora esten '
-                                                                    'correctos')
+                                                                    'correctos.')
                 self.progress_end.emit()
                 self.end_flag.value = False
                 return
@@ -358,7 +358,7 @@ class PluginUDEC(QObject, Extension):
             self.end_flag.value = False
             self.set_message_params('i', 'Operacion finalizada', 'Se termino la generacion de instrucciones. Las '
                                                                  'instrucciones fueron guardadas en el archivo '
-                                                                 'indicado')
+                                                                 'indicado.')
             self.progress_end.emit()
 
     @pyqtSlot(float, float, float, float, float, float, float, float, float, float, str, bool, str, str)
@@ -373,7 +373,7 @@ class PluginUDEC(QObject, Extension):
     def are_valid(self, params, file_params=None) -> bool:
         print("EN PROCESO DE VALIDACION")
         if 0 in params:
-            self.set_message_params('e', 'Faltan datos', 'Ingrese todos los datos solicitados e intente otra vez')
+            self.set_message_params('e', 'Faltan datos', 'Ingrese todos los datos solicitados e intente otra vez.')
             return False
         if file_params is not None:
             if file_params[1]:
@@ -404,8 +404,9 @@ class PluginUDEC(QObject, Extension):
 
         for element in coordinates:
             if abs(element[0]) > radio or abs(element[1]) > radio or abs(element[2]) > height:
-                self.set_message_params('Coordenadas incompatibles', 'La figura revanada es mas grande que el espacio'
-                                                               ' de trabajo disponible')
+                self.set_message_params('e', 'Coordenadas incompatibles',
+                                        'La figura revanada es mas grande que '
+                                        'el espacio de trabajo disponible.')
                 return False
         return True
 
