@@ -91,7 +91,8 @@ Window {
         }
 
         function onProgressChanged(progress) {
-            login_tab.item.change_progress(progress)
+            login_tab.item.change_progress(progress)            
+            login_tab.item.set_instructions_status("Cálculo en proceso...")
         }
 
         function onProgressTotalChanged(total) {
@@ -205,8 +206,12 @@ Window {
                 border.width: 1
 
                 function notify_gcode_status(){
-                    instructions_status_text.text = qsTr("No existe Gcode en el sistema.\nRebane una figura primero.")
+                    set_instructions_status("No existe Gcode en el sistema.\nRebane una figura primero.")
                     generate_instructions.enabled = false
+                }
+                function set_instructions_status(status){
+                    instructions_status_text.text = qsTr(status)
+                    if (progressBar.value == progressBar.maximumValue){instructions_status_text.text = qsTr("Instrucciones listas para su envío.")}
                 }
                 function change_progress(progress) {
                     progressBar.value = progress
@@ -436,7 +441,7 @@ Window {
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.top: parent.top
                             anchors.topMargin: 10
-                            text: qsTr("No existen instrucciones en memeoria")
+                            text: qsTr("No existen instrucciones en memoria.")
                             horizontalAlignment: Text.AlignHCenter
                             wrapMode: Text.WordWrap
                         }
@@ -482,7 +487,8 @@ Window {
                 }
             }
         }
-
+//#################################################################################################################################################################################################
+//#################################################################################################################################################################################################
         Tab {
             id: monitoring_tab
 
@@ -505,6 +511,10 @@ Window {
                     tagbox_2.model = tag_list
                     tagbox_3.model = tag_list
                     tagbox_4.model = tag_list
+                    tagbox2_1.model = tag_list
+                    tagbox2_2.model = tag_list
+                    tagbox2_3.model = tag_list
+                    tagbox2_4.model = tag_list
                 }
                 function stop_timer() {date_timer.running = false}
 
@@ -725,6 +735,9 @@ Window {
                                 anchors.top: parent.bottom
                                 anchors.topMargin: 5
                                 anchors.horizontalCenter: parent.horizontalCenter
+                                onAccepted: {
+                                    manager.write_value(tagbox2_1.currentText ,tagbox2_1_input.text)
+                                }
                             }
                         }
 
@@ -750,6 +763,9 @@ Window {
                                 anchors.top: parent.bottom
                                 anchors.topMargin: 5
                                 anchors.horizontalCenter: parent.horizontalCenter
+                                onAccepted: {
+                                    manager.write_value(tagbox2_2.currentText ,tagbox2_2_input.text)
+                                }
                             }
                         }
 
@@ -763,7 +779,8 @@ Window {
                                 tagbox3_active = true
                                 chart2.series(2).name = currentText
                                 chart2.series(2).clear()
-                            }                            TextField
+                            }
+                            TextField
                             {
                                 id: tagbox2_3_input
 
@@ -774,6 +791,9 @@ Window {
                                 anchors.top: parent.bottom
                                 anchors.topMargin: 5
                                 anchors.horizontalCenter: parent.horizontalCenter
+                                onAccepted: {
+                                    manager.write_value(tagbox2_3.currentText ,tagbox2_3_input.text)
+                                }
                             }
                         }
 
@@ -799,6 +819,9 @@ Window {
                                 anchors.top: parent.bottom
                                 anchors.topMargin: 5
                                 anchors.horizontalCenter: parent.horizontalCenter
+                                onAccepted: {
+                                    manager.write_value(tagbox2_4.currentText ,tagbox2_4_input.text)
+                                }
                             }
                         }
                     }
@@ -881,15 +904,15 @@ Window {
 
                 Component.onCompleted: {
                     console.log("Se ha iniciado QML\n")
-                    var series1 = chart.createSeries(ChartView.SeriesTypeLine,"tag 1",time_axis,axisY)
-                    var series2 = chart.createSeries(ChartView.SeriesTypeLine,"tag 2",time_axis,axisY)
-                    var series3 = chart.createSeries(ChartView.SeriesTypeLine,"tag 3",time_axis,axisY)
-                    var series4 = chart.createSeries(ChartView.SeriesTypeLine,"tag 4",time_axis,axisY)
+                    chart.createSeries(ChartView.SeriesTypeLine,"tag 1",time_axis,axisY)
+                    chart.createSeries(ChartView.SeriesTypeLine,"tag 2",time_axis,axisY)
+                    chart.createSeries(ChartView.SeriesTypeLine,"tag 3",time_axis,axisY)
+                    chart.createSeries(ChartView.SeriesTypeLine,"tag 4",time_axis,axisY)
 
-                    var series5 = chart2.createSeries(ChartView.SeriesTypeLine,"tag 5",time_axis2,axisY2)
-                    var series6 = chart2.createSeries(ChartView.SeriesTypeLine,"tag 6",time_axis2,axisY2)
-                    var series7 = chart2.createSeries(ChartView.SeriesTypeLine,"tag 7",time_axis2,axisY2)
-                    var series8 = chart2.createSeries(ChartView.SeriesTypeLine,"tag 8",time_axis2,axisY2)
+                    chart2.createSeries(ChartView.SeriesTypeLine,"tag 5",time_axis2,axisY2)
+                    chart2.createSeries(ChartView.SeriesTypeLine,"tag 6",time_axis2,axisY2)
+                    chart2.createSeries(ChartView.SeriesTypeLine,"tag 7",time_axis2,axisY2)
+                    chart2.createSeries(ChartView.SeriesTypeLine,"tag 8",time_axis2,axisY2)
                 }
 
                 Timer{
@@ -905,9 +928,14 @@ Window {
                         time_axis.min = new Date(year, 0, 0, hours, minutes - 1, seconds)
                         time_axis.max = new Date(year, 0, 0, hours, minutes, seconds)
 
-                        var tagboxes_info = {"tagbox_1" : [tagbox1_active, tagbox_1.currentText, 0], "tagbox_2" : [tagbox2_active, tagbox_2.currentText, 1], "tagbox_3" : [tagbox3_active, tagbox_3.currentText, 2], "tagbox_4" : [tagbox4_active, tagbox_4.currentText, 3]}
-                        var active_tagboxes = who_active(tagboxes_info)
-                        update_chart(active_tagboxes)
+                        time_axis2.min = new Date(year, 0, 0, hours, minutes - 1, seconds)
+                        time_axis2.max = new Date(year, 0, 0, hours, minutes, seconds)
+
+                        var upper_tagboxes_info = {"tagbox_1" : [tagbox1_active, tagbox_1.currentText, 0], "tagbox_2" : [tagbox2_active, tagbox_2.currentText, 1], "tagbox_3" : [tagbox3_active, tagbox_3.currentText, 2], "tagbox_4" : [tagbox4_active, tagbox_4.currentText, 3]}
+                        var lower_tagboxes_info = {"tagbox_1" : [tagbox1_active, tagbox2_1.currentText, 0], "tagbox_2" : [tagbox2_active, tagbox2_2.currentText, 1], "tagbox_3" : [tagbox3_active, tagbox2_3.currentText, 2], "tagbox_4" : [tagbox4_active, tagbox2_4.currentText, 3]}
+                        var upper_active_tagboxes = who_active(upper_tagboxes_info)
+                        var lower_active_tagboxes = who_active(lower_tagboxes_info)
+                        update_charts(upper_active_tagboxes, lower_active_tagboxes)
                     }
 
                     function who_active(tagbox_dict){
@@ -920,16 +948,28 @@ Window {
                         return active_elements
                     }
 
-                    function update_chart(tag_dict){
+                    function update_charts(upper_tag_dict, lower_tag_dict){
                         var tag_names = []
-                        for (let tag in tag_dict){
-                            tag_names.push(tag_dict[tag][0])
+                        var upper_len = 0
+                        var lower_len = 0
+                        for (let upper_tag in upper_tag_dict){
+                            tag_names.push(upper_tag_dict[upper_tag][0])
+                            upper_len++
                         }
+                        for (let lower_tag in lower_tag_dict){
+                            tag_names.push(lower_tag_dict[lower_tag][0])
+                            lower_len++
+                        }
+
                         if (tag_names.length != 0){
                             var tagbox_values = manager.update_series(tag_names, plc_path)
                             var counter = 0
-                            for (let element in tag_dict){
-                                chart.series(tag_dict[element][1]).append(time_axis.max, tagbox_values[counter])
+                            for (let u_element in upper_tag_dict){
+                                chart.series(upper_tag_dict[u_element][1]).append(time_axis.max, tagbox_values[counter])
+                                counter++
+                            }
+                            for (let l_element in lower_tag_dict){
+                                chart2.series(lower_tag_dict[l_element][1]).append(time_axis.max, tagbox_values[counter])
                                 counter++
                             }
                         }
@@ -937,6 +977,9 @@ Window {
                 }
             }
         }
+//#################################################################################################################################################################################################
+//#################################################################################################################################################################################################
+
         Tab {
             id: control_tab
 
@@ -970,12 +1013,12 @@ Window {
                     anchors.leftMargin: 150
                 }
 
-                ArrowButtons{id: right; anchors.left: crossreference.right; anchors.top: crossreference.top; transform: Rotation{origin.x: 0; origin.y: 0; angle: 0}}
+                ArrowButtons{id: right; anchors.left: crossreference.right; anchors.top: crossreference.top; rotation: 0; transform: Rotation{origin.x: 0; origin.y: 0; angle: 0}}
                              //lowButton.onClicked: {crossreference.width = crossreference.width+10}
                              //highButton.onClicked: {crossreference.width = crossreference.width-10}}
-                ArrowButtons{id: upup; anchors.left: crossreference.left; anchors.top: crossreference.top ; transform: Rotation{origin.x: 0; origin.y: 0; angle: 270}}
-                ArrowButtons{id: down; anchors.top: crossreference.bottom; anchors.left: crossreference.right ; transform: Rotation{origin.x: 0; origin.y: 0; angle: 90}}
-                ArrowButtons{id: left;  anchors.top: crossreference.bottom ; anchors.left: crossreference.left ; transform: Rotation{origin.x: 0; origin.y: 0; angle: 180}}
+                ArrowButtons{id: upup; anchors.left: crossreference.left; anchors.top: crossreference.top; rotation: 270; transform: Rotation{origin.x: 0; origin.y: 0; angle: 270}}
+                ArrowButtons{id: down; anchors.top: crossreference.bottom; anchors.left: crossreference.right; rotation: 90; transform: Rotation{origin.x: 0; origin.y: 0; angle: 90}}
+                ArrowButtons{id: left;  anchors.top: crossreference.bottom ; anchors.left: crossreference.left; rotation: 180; transform: Rotation{origin.x: 0; origin.y: 0; angle: 180}}
 
                 Rectangle{
                     id: zreference
@@ -986,8 +1029,73 @@ Window {
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
-                ArrowButtons{id: zup; anchors.left: zreference.left; anchors.top: zreference.top ; transform: Rotation{origin.x: 0; origin.y: 0; angle: 270}}
-                ArrowButtons{id: zdown; anchors.top: zreference.bottom; anchors.left: zreference.right ; transform: Rotation{origin.x: 0; origin.y: 0; angle: 90}}
+                ArrowButtons{id: zup; anchors.left: zreference.left; anchors.top: zreference.top; rotation: 270; transform: Rotation{origin.x: 0; origin.y: 0; angle: 270}}
+                ArrowButtons{id: zdown; anchors.top: zreference.bottom; anchors.left: zreference.right; rotation: 90; transform: Rotation{origin.x: 0; origin.y: 0; angle: 90}}
+                Image {
+                    id: doublearrow
+                    width: 300
+                    height: 350
+                    anchors.right: zreference.left
+                    anchors.rightMargin: -100
+                    anchors.verticalCenter: zreference.verticalCenter
+                    source: "./images/2wayarrow.png"
+                    Text {
+                        id: toptext
+                        text: qsTr("500")
+                        font.bold: true
+                        font.pointSize: 16
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.top
+                        anchors.bottomMargin: -30
+                    }
+                    Text {
+                        id: bottomtext
+                        text: qsTr("0")
+                        font.bold: true
+                        font.pointSize: 16
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.bottom
+                        anchors.topMargin: -30
+                    }
+                    Text {
+                        text: qsTr("Z")
+                        font.bold: true
+                        font.pointSize: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.left: bottomtext.left
+                        anchors.leftMargin: -15
+                    }
+                }
+                Image {
+                    id: y_arrow
+                    source: "./images/2wayarrow.png"
+                    anchors.centerIn: crossreference
+                    width: 90
+                    height: 90
+                    Text {
+                        id: y_label
+                        text: qsTr("Y")
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.horizontalCenterOffset: 10
+                        anchors.top: parent.top
+                    }
+                }
+                Image {
+                    id: x_arrow
+                    source: "./images/2wayarrow.png"
+                    anchors.centerIn: crossreference
+                    transform: Rotation{origin.x: x_arrow.width/2; origin.y: x_arrow.height/2; angle: 90}
+                    width:90
+                    height: 90
+                    Text {
+                        id: x_label
+                        text: qsTr("X")
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.horizontalCenterOffset: 10
+                        anchors.top: parent.top
+                        transform: Rotation{origin.x: x_label.width/2; origin.y: x_label.height/2; angle: -90}
+                    }
+                }
 
                 RowLayout{
                     spacing: 30
@@ -1027,8 +1135,8 @@ Window {
 
                 Rectangle{
                     id: utilities
-                    width: frame.width/2 - 200
-                    height: 430
+                    width: childrenRect.width + 50
+                    height: childrenRect.height + 20
                     anchors.right: parent.right
                     anchors.rightMargin: 30
                     anchors.verticalCenter: parent.verticalCenter
@@ -1042,12 +1150,12 @@ Window {
                         font.pointSize: 16;
                         font.pixelSize: 20;
                         anchors.top: parent.top;
-                        anchors.topMargin: 20;
+                        anchors.topMargin: 10
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
 
                     ColumnLayout{
-                        spacing: 50
+                        spacing: 15
                         anchors.top: utilities_title.bottom
                         anchors.topMargin: 30
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -1121,7 +1229,13 @@ Window {
                                 font.pointSize: 14
                             }
                         }
-                        ParamArea{id: max_speed; name: "Velocidad max.\ndel efector"; helpSide: "below"; Layout.alignment: Qt.AlignRight}
+                        ParamArea{id: max_speed; name: "Velocidad max.\ndel efector"; placeholder: qsTr("Dimension en m/s"); Layout.alignment: Qt.AlignRight}
+                        ParamArea{id: kff_a; name: "Kff_accel"; placeholder: qsTr("ingrese un valor"); help: "Ganancia de pre-alimentación de acceleración"; helpSide: "left"; Layout.alignment: Qt.AlignRight}
+                        ParamArea{id: kff_v; name: "Kff_veloc"; placeholder: qsTr("ingrese un valor"); help: "Ganancia de pre-alimentación de velocidad"; helpSide: "left"; Layout.alignment: Qt.AlignRight}
+                        ParamArea{id: kp_p; name: "Kp_pos"; placeholder: qsTr("ingrese un valor"); help: "Ganancia proporcional de acceleración"; helpSide: "left"; Layout.alignment: Qt.AlignRight}
+                        ParamArea{id: ki_p; name: "Ki_pos"; placeholder: qsTr("ingrese un valor"); help: "Ganancia integral de acceleración"; helpSide: "left"; Layout.alignment: Qt.AlignRight}
+                        ParamArea{id: kp_v; name: "Kp_veloc"; placeholder: qsTr("ingrese un valor"); help: "Ganancia proporcional de velocidad"; helpSide: "left"; Layout.alignment: Qt.AlignRight}
+                        ParamArea{id: ki_v; name: "Ki_veloc"; placeholder: qsTr("ingrese un valor"); help: "Ganancia integral de velocidad"; helpSide: "left"; Layout.alignment: Qt.AlignRight}
                     }
                 }
             }
