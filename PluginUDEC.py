@@ -21,6 +21,7 @@ from UM.PluginRegistry import PluginRegistry
 from UM.i18n import i18nCatalog
 from cura.CuraApplication import CuraApplication
 from .pycomm3.pycomm3 import LogixDriver
+#from pycomm3 import LogixDriver
 
 import os
 
@@ -73,6 +74,29 @@ class PluginUDEC(QObject, Extension):
         #self.worker_thread.start()
 
     @pyqtSlot(str, result=list)
+    def plc_info(self, ip) -> List[str]:
+        self.ip = ip
+        try:
+            with LogixDriver(ip, init__program_tags=True) as plc:
+            #plc = LogixDriver(ip, init__program_tags=True)
+                #plc.open()
+                is_connected = plc.connected
+                product_name = plc.info["product_name"]
+                name = plc.info["name"]
+                programs = ""
+                for program in list(plc.info["programs"].keys()):
+                    programs += str(program)
+            #plc.close()
+            return [product_name, name, programs, is_connected]
+        except:
+            self.set_message_params('e', 'Se produjo un error',
+                                    'Se ha producido un error de conexion. '
+                                    'Por favor revise que la direccion IP sea '
+                                    'la correcta.')
+            self.progress_end.emit()
+            return ["-----------", "-----------", "-----------", False]
+
+    @pyqtSlot(str, result=list)
     def plc_tag_list(self, ip) -> List[str]:
         """Gets the list of program tagsand returns a list containing the names of all tags
         with less than 100 elements"""
@@ -84,6 +108,20 @@ class PluginUDEC(QObject, Extension):
         tag_name_list = self.get_names(self.get_tags_info(tag_list))
         plc.close()
         return tag_name_list
+
+    @pyqtSlot(list, str, result=list)
+    def update_series(self, tag_list, ip) -> List[float]:
+        """Reads the values of the tags in tag_list from the device associated with
+        the given IP address"""
+
+        tag_names = self.extract_names(tag_list)
+        plc = LogixDriver(ip)
+        n_tags = len(tag_names)
+        plc.open()
+        tag_read = plc.read(*tag_names)
+        plc.close()
+        values = self.extract_values(tag_read, n_tags)
+        return values
 
     def get_names(self, tag_list) -> List[str]:
         tag_name_list = []
@@ -175,25 +213,6 @@ class PluginUDEC(QObject, Extension):
             values.append(tag_value)
         return values
 
-    @pyqtSlot(list, str, result=list)
-    def update_series(self, tag_list, ip) -> List[float]:
-        """Reads the values of the tags in tag_list from the device associated with
-        the given IP address"""
-
-        tag_names = self.extract_names(tag_list)
-        plc = LogixDriver(ip)
-        n_tags = len(tag_names)
-        plc.open()
-        tag_read = plc.read(*tag_names)
-        plc.close()
-        values = self.extract_values(tag_read, n_tags)
-        return values
-
-    @pyqtSlot(str)
-    def save_value(self, ip):
-        with LogixDriver(ip) as plc:
-            self.new_value = plc.read('Program:MainProgram.array_tag{3}').value[0]
-
     def show_connect(self):
         """Displays an error message with the given title and message"""
 
@@ -202,25 +221,6 @@ class PluginUDEC(QObject, Extension):
             Logger.log("e", "Not creating Connect window since the QML component failed to be created.")
             return
         self.connect_view.show()
-
-    @pyqtSlot(str, result=list)
-    def plc_info(self, ip) -> List[str]:
-        try:
-            with LogixDriver(ip, init__program_tags=True) as plc:
-                is_connected = plc.connected
-                product_name = plc.info["product_name"]
-                name = plc.info["name"]
-                programs = ""
-                for program in list(plc.info["programs"].keys()):
-                    programs += str(program)
-            return [product_name, name, programs, is_connected]
-        except:
-            self.set_message_params('e', 'Se produjo un error',
-                                    'Se ha producido un error de conexion. '
-                                    'Por favor revise que la direccion IP sea '
-                                    'la correcta.')
-            self.progress_end.emit()
-            return ["-----------", "-----------", "-----------", False]
 
     @pyqtSlot()
     def send_instructions(self):
@@ -306,8 +306,12 @@ class PluginUDEC(QObject, Extension):
     @pyqtSlot(str, int)
     def write_value(self, tag_name, new_value):
         tag_valid_name = self.extract_tag_name(tag_name)
-        with LogixDriver (self.ip) as plc:
+        with LogixDriver(self.ip) as plc:
             plc.write(tag_valid_name, new_value)
+
+    #@pyqtSlot()
+    #def start_printing(self):
+
 
 # ----------------------------------------------------------------------------------------------------
 
